@@ -1,0 +1,36 @@
+sensors:
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /tof_shoulder_plugin/out
+    max_range: 3.0
+    point_subsample: 1
+    padding_offset: 0.05
+    padding_scale: 1.0
+    filtered_cloud_topic: filtered_cloud_shoulder
+    frame_subsample: 1
+    max_update_rate: 5.0
+    queue_size: 5
+    frame: tof_shoulder_link
+
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /tof_forearm_plugin/out
+    max_range: 3.0
+    point_subsample: 1
+    padding_offset: 0.05
+    padding_scale: 1.0
+    filtered_cloud_topic: filtered_cloud_forearm
+    frame_subsample: 1
+    max_update_rate: 5.0
+    queue_size: 5
+    frame: tof_forearm_link
+
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /tof_wrist_plugin/out
+    max_range: 3.0
+    point_subsample: 1
+    padding_offset: 0.05
+    padding_scale: 1.0
+    filtered_cloud_topic: filtered_cloud_wrist
+    frame_subsample: 1
+    max_update_rate: 5.0
+    queue_size: 5
+    frame: tof_wrist_link

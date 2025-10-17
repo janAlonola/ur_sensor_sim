@@ -54,8 +54,8 @@ def launch_setup(context, *args, **kwargs):
     runtime_config_package = LaunchConfiguration("runtime_config_package")
     controllers_file = LaunchConfiguration("controllers_file")
     initial_positions_file = LaunchConfiguration("initial_positions_file")
+    # Changed
     description_package = LaunchConfiguration("description_package")
-    description_file = LaunchConfiguration("description_file")
     description_file = LaunchConfiguration("description_file")
     prefix = LaunchConfiguration("prefix")
     start_joint_controller = LaunchConfiguration("start_joint_controller")
@@ -265,16 +265,15 @@ def generate_launch_description():
     declared_arguments.append(
         DeclareLaunchArgument(
             "description_package",
-            default_value="ur_description",
-            description="Description package with robot URDF/XACRO files. Usually the argument \
-        is not set, it enables use of a custom description.",
+            default_value="ur_tof_description", # changed to tof ur_description
+            description="Using the ToF-extended UR description package.",
         )
     )
     declared_arguments.append(
         DeclareLaunchArgument(
             "description_file",
-            default_value="ur.urdf.xacro",
-            description="URDF/XACRO description file with the robot.",
+            default_value="ur_with_tof.urdf.xacro",
+            description="URDF/XACRO file with the ToF sensors attached.",
         )
     )
     declared_arguments.append(

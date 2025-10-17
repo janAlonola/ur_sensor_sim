@@ -1,6 +1,12 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <xacro:macro name="tof_sensor" params="name parent xyz:='0 0 0' rpy:='0 0 0' min_range:=0.01 max_range:=2.0 rate:=30">
+  <!--
+    Simulates a VL53L7CX ToF array (~8x8 beams)
+    - Visible in Gazebo
+    - No collision geometry
+    - Publishes PointCloud2 on /<name>/points
+  -->
+  <xacro:macro name="tof_sensor" params="name parent xyz:='0 0 0' rpy:='0 0 0' min_range:=0.03 max_range:=3.5 rate:=15">
     <link name="${name}_link">
       <visual>
         <origin xyz="0 0 0.015" rpy="0 0 0"/>
@@ -9,13 +15,11 @@
           <color rgba="0.0 0.0 1.0 1.0"/>
         </material>
       </visual>
-      <collision>
-        <geometry><cylinder radius="0.01" length="0.03"/></geometry>
-      </collision>
+
       <inertial>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <mass value="0.001"/>
-        <inertia ixx="1e-6" ixy="0.0" ixz="0.0" iyy="1e-6" iyz="0.0" izz="1e-6"/>
+        <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
       </inertial>
     </link>
 
@@ -27,18 +31,37 @@
 
     <gazebo reference="${name}_link">
       <sensor name="${name}_sensor" type="ray">
+        <always_on>true</always_on>
+        <visualize>true</visualize>
         <update_rate>${rate}</update_rate>
         <ray>
-          <scan><horizontal><samples>1</samples><resolution>1</resolution><min_angle>0.0</min_angle><max_angle>0.0</max_angle></horizontal></scan>
-          <range><min>${min_range}</min><max>${max_range}</max><resolution>0.001</resolution></range>
+          <scan>
+            <horizontal>
+              <samples>8</samples>
+              <resolution>1</resolution>
+              <min_angle>-0.523599</min_angle>  <!-- -30° -->
+              <max_angle> 0.523599</max_angle>  <!--  30° -->
+            </horizontal>
+            <vertical>
+              <samples>8</samples>
+              <resolution>1</resolution>
+              <min_angle>-0.523599</min_angle>
+              <max_angle> 0.523599</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>${min_range}</min>
+            <max>${max_range}</max>
+            <resolution>0.001</resolution>
+          </range>
         </ray>
+
         <plugin name="${name}_plugin" filename="libgazebo_ros_ray_sensor.so">
-          <ros>
-            <remapping>~/out:=/${name}/range</remapping>
-          </ros>
-          <output_type>sensor_msgs/Range</output_type>
+          <output_type>sensor_msgs/PointCloud2</output_type>
+          <frame_name>${name}_link</frame_name>
         </plugin>
       </sensor>
     </gazebo>
+
   </xacro:macro>
 </robot>
