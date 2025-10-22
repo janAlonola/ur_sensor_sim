@@ -9,7 +9,7 @@
   <xacro:macro name="tof_sensor" params="name parent xyz:='0 0 0' rpy:='0 0 0' min_range:=0.03 max_range:=3.5 rate:=15">
     <link name="${name}_link">
       <visual>
-        <origin xyz="0 0 0.015" rpy="0 0 0"/>
+        <origin xyz="0.015 0 0" rpy="0 1.5708 0"/>
         <geometry><cylinder radius="0.01" length="0.03"/></geometry>
         <material name="${name}_mat">
           <color rgba="0.0 0.0 1.0 1.0"/>
