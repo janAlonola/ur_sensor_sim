@@ -6,6 +6,15 @@ find_package(ament_cmake REQUIRED)
 install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
+install(PROGRAMS
+  scripts/ur_pose.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(PROGRAMS
+  scripts/visualize_voxels.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 if(BUILD_TESTING)
   find_package(launch_testing_ament_cmake)
