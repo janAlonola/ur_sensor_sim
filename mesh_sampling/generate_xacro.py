@@ -91,7 +91,7 @@ TEMPLATE_HEAD = """<?xml version="1.0"?>
       safety_pos_margin="0.15"
       safety_k_position="20"
       sim_gazebo="true">
-    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <origin xyz="0 0 0.25" rpy="0 0 0"/>
   </xacro:ur_robot>
 
   <!-- Attach ToF sensors (auto-generated) -->
@@ -110,7 +110,7 @@ TEMPLATE_TAIL = """
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--yaml", default="mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
+    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
     ap.add_argument("--out", default="ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro", help="Write to file (default: stdout)")
     ap.add_argument("--pick-n", type=int, default=10, help="How many sensors to place")
     ap.add_argument("--stride", type=int, default=40, help="Take every stride-th candidate (ignored if --indices given)")

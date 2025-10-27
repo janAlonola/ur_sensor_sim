@@ -39,15 +39,17 @@ class MoveItPoseSelector(Node):
 
         # 3 wrist configurations (deg)
         wrist_sets = [
-            (0, 0, 0),        # x
-            (0, 90, 0),     # z
-            (-90, 90, 0),     # y
+            (-90, 0, 0),        # x
+            (0, 90, 0),         # z     # -90 90 0 for 13    
+            (-90, 90, 0),       # y
         ]
 
         # Combine into 15 poses
         self.poses = []
         for b in base_sets:
             for w in wrist_sets:
+                if b == (0, -90, 160) and w == (0, 90, 0):
+                    w = (-180, -90, 0)
                 pose = deg2rad([*b, *w])
                 self.poses.append(pose)
 

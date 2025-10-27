@@ -15,9 +15,9 @@ class VoxelPointCloudPublisher(Node):
         super().__init__('voxel_pc2_publisher')
 
         # Params
-        self.declare_parameter('yaml_file', 'tmp/workspace_prism.yaml')
+        self.declare_parameter('yaml_file', 'ur_sensor_sim/tmp/capsule.yaml')
         self.declare_parameter('topic', '/workspace_voxels')
-        self.declare_parameter('frame', 'base_link')
+        self.declare_parameter('frame', 'world')
         self.declare_parameter('publish_rate', 1.0)
         self.declare_parameter('heatmap', False)
 
