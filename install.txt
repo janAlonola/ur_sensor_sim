@@ -1,0 +1,30 @@
+Add the following to ur_moveit_config.launch.py and add gazebo_sensor.yaml into the config folder
+
+sensors_3d = load_yaml("ur_moveit_config", "config/gazebo_sensor.yaml")
+
+    octomap_updater = { 'octomap_frame': 'world',
+                        'octomap_resolution': 0.1,
+                        'max_range': 4.0,
+                        'sensor_plugin': 'occupancy_map_monitor/PointCloudOctomapUpdater'}
+
+    # Start the actual move_group node/action server
+    move_group_node = Node(
+        package="moveit_ros_move_group",
+        executable="move_group",
+        output="screen",
+        parameters=[
+            robot_description,
+            robot_description_semantic,
+            publish_robot_description_semantic,
+            robot_description_kinematics,
+            robot_description_planning,
+            ompl_planning_pipeline_config,
+            trajectory_execution,
+            moveit_controllers,
+            planning_scene_monitor_parameters,
+            {"use_sim_time": use_sim_time},
+            warehouse_ros_config,
+            sensors_3d,
+            octomap_updater,
+        ],
+    )
