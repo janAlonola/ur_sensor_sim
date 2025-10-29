@@ -13,7 +13,7 @@ Output:
 
 Assumptions:
  - Sensor local +Z axis is the viewing direction (or was it y?)
- - Field of view is symmetric cone (horizontal_fov_deg)
+ - Field of view is symmetric cone (fov_deg)
  - No occlusion check (line-of-sight optional extension)
 """
 
@@ -125,52 +125,142 @@ def compute_visibility(voxels, sensors, max_range=3.5, fov_deg=60.0):
 
     return visible
 
-def print_urdf_link_transforms(urdf, joint_cfg=None, base_frame=None, limit=None):
-    """
-    Print all URDF link transforms in the current configuration.
-    Helps debug misaligned joints or base transforms.
-    """
-    if joint_cfg is None:
-        joint_cfg = {}
+import numpy as np
+import math
+from pathlib import Path
+import yaml
 
-    fk = urdf.link_fk(cfg=joint_cfg)
-    link_by_name = {L.name: L for L in urdf.links}
-
-    if base_frame is not None and base_frame != urdf.base_link.name:
-        req_link = link_by_name[base_frame]
-        T_base_req = fk[req_link]
-    else:
-        T_base_req = np.eye(4)
-
-    print("──────────────────────────────")
-    print("📦 URDF LINK TRANSFORMS")
-    print(f"Base link: {urdf.base_link.name}")
-    if base_frame:
-        print(f"Rebased to: {base_frame}")
-
-    count = 0
-    for link, T in fk.items():
-        # Transform into base_frame if needed
-        T_rel = np.linalg.inv(T_base_req) @ T
-        xyz = T_rel[:3, 3]
-        rpy = mat2euler(T_rel[:3, :3], axes="sxyz")
-        print(f" {link.name:20s} → xyz=({xyz[0]:.3f},{xyz[1]:.3f},{xyz[2]:.3f})  "
-              f"rpy=({rpy[0]:.2f},{rpy[1]:.2f},{rpy[2]:.2f})")
-        count += 1
-        if limit and count >= limit:
-            print(f"… truncated ({len(fk)} total links)")
-            break
-
-    print("──────────────────────────────")
-
+def deg2rad(vals):
+    return [math.radians(v) for v in vals]
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml", help="Path to workspace_voxels.yaml")
+    ap.add_argument("--out", default="rand_heatmap.yaml", help="Output YAML file")
+    ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
+    ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
+    args = ap.parse_args()
+
+    # Load data
+    cand = load_yaml(args.candidates)
+    vox  = load_yaml(args.voxels)
+    sensors = cand["candidates"]
+    #random
+    indices = [982, 765, 787, 999, 145, 95, 884, 719, 316, 829, 657, 496, 99, 127, 1028, 964, 669, 989, 395, 1120]
+    #optimized
+    #indices = [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860]
+    # Extract those sensors
+    sensors = [sensors[i] for i in indices]
+    [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
+    voxels = np.array(vox["voxels"], dtype=np.float32)
+
+    print(f"[INFO] Loaded {len(sensors)} sensors and {len(voxels)} voxels.")
+ 
+    urdf = URDF.load("ur_sensor_sim/tmp/ur10.urdf")
+    base_frame = "world"
+
+    # -------------------------------
+    # Define 15 representative poses
+    # -------------------------------
+    joint_names = [
+        "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+        "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"
+    ]
+
+    base_sets = [
+        (0, -90, 0),
+    #    (0, 0, 0),
+    #    (0, -90, 90),
+    #    (0, -125, 90),
+    #    (0, -90, 160),
+    ]
+    wrist_sets = [
+        (-90, 0, 0),
+    #    (0, 90, 0),
+    #   (-90, 90, 0),
+    ]
+
+    poses = []
+    for b in base_sets:
+        for w in wrist_sets:
+            if b == (0, -90, 160) and w == (0, 90, 0):
+                w = (-180, -90, 0)
+            pose = deg2rad([*b, *w])
+            poses.append(pose)
+
+    print(f"[INFO] Generated {len(poses)} joint-space test poses.")
+
+    # ------------------------------------------
+    # Compute combined visibility over all poses
+    # ------------------------------------------
+    Nvox = len(voxels)
+    Nposes = len(poses)
+    all_visible = np.zeros((Nvox,), dtype=int)  # coverage count per voxel
+    sum_coverage = np.zeros((Nvox,), dtype=int) # coverage count per voxel in sensor amounts
+    visible_by_pose = []                        # what voxels are seen by what sensor in what pose
+
+    for i, pose in enumerate(poses):
+        joint_cfg = {name: val for name, val in zip(joint_names, pose)}
+
+        # Transform all sensors for this configuration
+        sensors_world = []
+        for s in sensors:
+            xyz_w, rpy_w = sensor_pose_to_base(s, urdf, joint_cfg, base_frame=base_frame)
+            sensors_world.append({
+                'xyz': xyz_w,
+                'rpy': rpy_w,
+                'max_range': s.get('max_range', args.max_range),
+            })
+
+        visible = compute_visibility(voxels, sensors_world, args.max_range, args.fov)
+        coverage = visible.sum(axis=1)
+
+        all_visible += coverage > 0  # count voxel seen at least once in this pose
+        sum_coverage += coverage
+
+        # Per-voxel list of sensors that saw it in this pose
+        voxel_to_sensors = [np.nonzero(visible[i])[0].tolist() for i in range(Nvox)]
+        visible_by_pose.append(voxel_to_sensors)
+        print(f"[Pose {i+1:02d}/{Nposes}] mean={coverage.mean():.2f}, unseen={np.count_nonzero(coverage==0)}")
+
+    # ------------------------------------------
+    # Final statistics
+    # ------------------------------------------
+    print(f"[INFO] Aggregated visibility across {Nposes} poses.")
+    print(f"[INFO] {np.count_nonzero(all_visible==0)} voxels never seen.")
+    print(f"[INFO] {np.count_nonzero(all_visible>0)} voxels visible at least once.")
+
+    # Save combined result
+    data = {
+        "voxel_size_m": vox["voxel_size_m"],
+        "voxel_count": int(len(voxels)),
+        "sensor_count": int(len(sensors)),
+        "pose_count": Nposes,
+        "fov_deg": float(args.fov),
+        "max_range_m": float(args.max_range),
+        "voxels": voxels.tolist(),
+        "coverage_poses": all_visible.tolist(),
+        "coverage": sum_coverage.tolist(),
+        #"visible_by": visible_by_pose,
+    }
+
+    Path(args.out).write_text(yaml.safe_dump(data, sort_keys=False))
+    print(f"[OK] Wrote combined heatmap to {args.out}")
+
+
+if __name__ == "__main__":
+    main()
+
+
+"""
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
+    ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml", help="Path to workspace_voxels.yaml")
     ap.add_argument("--out", default="heatmap.yaml", help="Output YAML file")
-    ap.add_argument("--hfov", type=float, default=60.0, help="Horizontal field of view (deg)")
+    ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=0.5, help="Sensor max range (m)")
     args = ap.parse_args()
 
@@ -187,11 +277,11 @@ def main():
     joint_cfg = {'shoulder_pan_joint': 0.0, 'shoulder_lift_joint': 0.0, 'elbow_joint': -1.5708,
             'wrist_1_joint': 0.0, 'wrist_2_joint': 0.0, 'wrist_3_joint': 0.0}
     
-    """
-    Create urdf from xacro
-    > xacro src/ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro -o  /tmp/ur10_expanded.urdf
-    > strip all file:// prefixes
-    """
+
+    #Create urdf from xacro
+    #> xacro src/ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro -o  /tmp/ur10_expanded.urdf
+    #> strip all file:// prefixes
+
     
     urdf = URDF.load("ur_sensor_sim/tmp/ur10.urdf")
 
@@ -208,7 +298,7 @@ def main():
     #sensors_world = [sensors_world[-1]]
 
     # Compute visibility
-    visible = compute_visibility(voxels, sensors_world, args.max_range, args.hfov)
+    visible = compute_visibility(voxels, sensors_world, args.max_range, args.fov)
     coverage = visible.sum(axis=1)
     #voxel_to_sensors = [np.nonzero(visible[i])[0].tolist() for i in range(len(voxels))]
 
@@ -220,7 +310,7 @@ def main():
         "voxel_size_m": vox["voxel_size_m"],
         "voxel_count": int(len(voxels)),
         "sensor_count": int(len(sensors)),
-        "hfov_deg": float(args.hfov),
+        "fov_deg": float(args.fov),
         "max_range_m": float(args.max_range),
         "voxels": voxels.tolist(),
         "coverage": coverage.tolist(),
@@ -231,6 +321,4 @@ def main():
     print(f"[OK] Wrote {args.out}")
 
     print_urdf_link_transforms(urdf, joint_cfg, base_frame="world", limit=20)
-
-if __name__ == "__main__":
-    main()
+"""

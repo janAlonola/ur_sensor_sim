@@ -126,7 +126,10 @@ def main():
         print("ERROR: no candidates found in YAML", file=sys.stderr)
         sys.exit(2)
 
-    sel = select_indices(len(cands), args.pick_n, args.stride, args.indices)
+
+
+    sel = [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
+    #= select_indices(len(cands), args.pick_n, args.stride, args.indices)
 
     # Build Xacro
     parts = [TEMPLATE_HEAD]
