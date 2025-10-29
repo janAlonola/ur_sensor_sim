@@ -31,18 +31,6 @@
     <origin xyz="0 0 0.25" rpy="0 0 0"/>
   </xacro:ur_robot>
 
-  <!-- Attach ToF sensors (auto-generated) -->
-  <xacro:tof_sensor name="tof_0" parent="base_link_inertia" xyz="-0.0797764151 0.00555363643 0.0336772195" rpy="-3.05105088 -0.000590753406 3.05105088" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_40" parent="base_link_inertia" xyz="0.00503601732 0.0610580514 -0.005" rpy="3.14159265 1.57079633 0" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_80" parent="forearm_link" xyz="-0.612050918 -0.0315296491 0.104844364" rpy="2.47463437 -1.09343012e-16 -2.47463437" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_120" parent="forearm_link" xyz="-0.53277249 -0.0410818426 0.0199500915" rpy="1.58535161 0.593151936 -1.58535161" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_160" parent="forearm_link" xyz="-0.427460762 -0.0107982347 0.094957204" rpy="1.57079749 -1.32533766 -1.57079749" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_200" parent="forearm_link" xyz="-0.31601453 0.045634711 0.0334473055" rpy="-1.57079628 0.343584055 1.57079628" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_240" parent="forearm_link" xyz="-0.194615769 -0.0468064701 0.0377606567" rpy="1.57079629 0.245472372 -1.57079629" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_280" parent="forearm_link" xyz="-0.0898612315 0.031500361 0.0120712985" rpy="-1.57079585 0.834520285 1.57079585" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_320" parent="forearm_link" xyz="-0.033049631 -0.00648535593 -0.00645266636" rpy="5.14279111e-05 1.1638215 -5.14279111e-05" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_360" parent="forearm_link" xyz="0.0275892508 0.055733588 0.100482886" rpy="-1.10378604 -0.000616611391 1.10378604" max_range="3" rate="15"/>
-
   <!-- Gazebo ROS 2 Control -->
   <gazebo>
     <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">

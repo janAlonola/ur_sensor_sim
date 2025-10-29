@@ -52,7 +52,7 @@ class NormalsViz(Node):
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--yaml", default="mesh_sampling/candidates.yaml")
+    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/candidates.yaml")
     ap.add_argument("--topic", default="/sensor_normals")
     ap.add_argument("--length", type=float, default=0.10)
     args = ap.parse_args()

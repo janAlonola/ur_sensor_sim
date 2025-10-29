@@ -120,7 +120,7 @@ def generate_voxels_from_polygon(poly, voxel, width_y, zmin, zmax):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--voxel-size", type=float, default=0.05, help="Voxel edge (m)")
-    ap.add_argument("--buffer-size", type=float, default=1.0, help="Buffer size (m)")
+    ap.add_argument("--buffer-size", type=float, default=0.5, help="Buffer size (m)")
     ap.add_argument("--width-y", type=float, default=0.25, help="Extrusion width (m, ±y/2)")
     ap.add_argument("--out", default="ur_sensor_sim/tmp/capsule.yaml", help="Output YAML")
     ap.add_argument("--arc-samples", type=int, default=40, help="Samples along quarter-arc")
