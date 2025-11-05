@@ -20,16 +20,15 @@ Assumptions:
 import argparse
 import math
 import numpy as np
-if not hasattr(np, 'float'):
-    np.float = float
-    np.int = int
-    np.bool = bool
 import yaml
 from pathlib import Path
 import transforms3d as t3d
 from urdfpy import URDF
 from transforms3d.euler import euler2mat, mat2euler
-
+if not hasattr(np, 'float'):
+    np.float = float
+    np.int = int
+    np.bool = bool
 # --------------------------
 # Helper functions
 # --------------------------
@@ -138,7 +137,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml", help="Path to workspace_voxels.yaml")
-    ap.add_argument("--out", default="rand_heatmap.yaml", help="Output YAML file")
+    ap.add_argument("--out", default="trash_heatmap.yaml", help="Output YAML file")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
     args = ap.parse_args()
@@ -148,12 +147,12 @@ def main():
     vox  = load_yaml(args.voxels)
     sensors = cand["candidates"]
     #random
-    indices = [982, 765, 787, 999, 145, 95, 884, 719, 316, 829, 657, 496, 99, 127, 1028, 964, 669, 989, 395, 1120]
+    #indices = [982, 765, 787, 999, 145, 95, 884, 719, 316, 829, 657, 496, 99, 127, 1028, 964, 669, 989, 395, 1120]
     #optimized
-    #indices = [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860]
+    indices = [0, 15, 76, 285, 296, 311, 367, 368, 389, 392, 626, 824, 851, 858, 859, 861, 933, 942, 995, 1118] #[452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860]
     # Extract those sensors
     sensors = [sensors[i] for i in indices]
-    [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
+    #[452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
     voxels = np.array(vox["voxels"], dtype=np.float32)
 
     print(f"[INFO] Loaded {len(sensors)} sensors and {len(voxels)} voxels.")
@@ -243,7 +242,7 @@ def main():
         "voxels": voxels.tolist(),
         "coverage_poses": all_visible.tolist(),
         "coverage": sum_coverage.tolist(),
-        #"visible_by": visible_by_pose,
+        "visible_by": visible_by_pose,
     }
 
     Path(args.out).write_text(yaml.safe_dump(data, sort_keys=False))
