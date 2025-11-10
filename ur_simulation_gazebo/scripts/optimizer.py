@@ -3,20 +3,11 @@
 GRASP (Greedy Randomized Adaptive Search Procedure) for Sensor Selection
 ----------------------------------------------------------------------
 
-Problem: pick up to k sensors to maximize covered voxels (weighted or unweighted)
-from a YAML file with:
-  - voxel_count (int)
-  - sensor_count (int)
-  - pose_count (int)
-  - visible_by: list[pose][voxel] -> list of sensor indices
-
-We precompute per-sensor voxel sets (union across all poses), then run:
-  1) randomized greedy construction with a restricted candidate list (RCL)
-  2) 1-swap local search improvement
-Repeat for 'iters' restarts and keep the best.
-
-Usage:
-  python grasp_max_coverage.py heatmap_with_v_by_s.yaml --k 10 --iters 50 --rcl-size 5
+Now supports WEIGHTED coverage:
+- If --weights <.npy> is provided, those weights are used.
+- Else, if the YAML contains a per-voxel array under --yaml-weight-key (default: 'weights'),
+  those are used.
+- Else, falls back to unweighted coverage.
 
 Author: you + ChatGPT
 """
@@ -42,27 +33,128 @@ import time
 
 from multiprocessing import Pool, cpu_count
 from functools import partial
+from scipy.sparse import csr_matrix
+
+def build_sensor_csr(sensor_sets, V) -> csr_matrix:
+    """Build SxV boolean CSR from list[set[int]]."""
+    S = len(sensor_sets)
+    indptr = [0]
+    indices = []
+    for s in range(S):
+        cols = sorted(sensor_sets[s])
+        indices.extend(cols)
+        indptr.append(len(indices))
+    data = np.ones(len(indices), dtype=np.float32)  # boolean-as-float for matvec
+    return csr_matrix((data, indices, np.array(indptr, dtype=np.int32)), shape=(S, V))
+
+def grasp_max_coverage_sparse(A: csr_matrix,
+                              universe_size: int,
+                              k: int,
+                              rcl_size: int = 5,
+                              iters: int = 20,
+                              weights: Optional[np.ndarray] = None,
+                              local_search_rounds: int = 100,
+                              early_stop_no_improve: Optional[int] = None,
+                              verbose: bool = True,
+                              seed: Optional[int] = None):
+    """
+    Same API as your original, but construction uses sparse matvec instead of Python sets.
+    """
+    if seed is not None:
+        random.seed(seed); np.random.seed(seed)
+
+    S, V = A.shape
+    assert V == universe_size
+    ones = (weights is None)
+    wvec = np.ones(V, dtype=np.float32) if ones else weights.astype(np.float32)
+
+    best_selected, best_covered_mask = [], np.zeros(V, dtype=bool)
+    best_score = -1.0
+    no_improve = 0
+
+    for it in range(1, iters + 1):
+        covered_mask = np.zeros(V, dtype=bool)
+        selected = []
+        remaining = np.ones(S, dtype=bool)  # True if sensor still available
+
+        for step in range(k):
+            # available weight per voxel
+            avail = (~covered_mask).astype(np.float32) * wvec
+            # gains for all sensors at once
+            gains = A.dot(avail)  # shape (S,)
+            gains[~remaining] = -1.0  # mask out already selected
+
+            # build RCL
+            # take top rcl_size positive gains
+            if np.all(gains <= 0):
+                break
+            idx_sorted = np.argpartition(-gains, kth=min(rcl_size-1, gains.size-1))[:rcl_size]
+            idx_sorted = idx_sorted[np.argsort(-gains[idx_sorted])]
+            s_pick = int(random.choice(idx_sorted.tolist()))
+            gain = float(gains[s_pick])
+
+            # update covered & remaining
+            row = A.getrow(s_pick)
+            covered_mask[row.indices] = True
+            remaining[s_pick] = False
+            selected.append(s_pick)
+
+            if verbose:
+                if ones:
+                    # approximate newly covered count:
+                    new_cov = row.indices[~covered_mask[row.indices]].size  # tiny undercount due to update order
+                    print(f"[it {it:02d} | step {step+1:02d}] pick {s_pick} +≈{new_cov} (cum {covered_mask.sum()}/{V})")
+                else:
+                    print(f"[it {it:02d} | step {step+1:02d}] pick {s_pick} +w{gain:.3f} (cum_w {A.dot((~covered_mask)*0 + wvec * covered_mask).sum():.3f})")
+
+            if covered_mask.all():
+                break
+
+        # score the result
+        if ones:
+            score2 = float(covered_mask.sum())
+        else:
+            score2 = float(wvec[covered_mask].sum())
+
+        if score2 > best_score + 1e-12:
+            best_score = score2
+            best_selected = selected[:]
+            best_covered_mask = covered_mask.copy()
+            no_improve = 0
+            if verbose:
+                if ones:
+                    print(f"[it {it:02d}] New best (unweighted): {best_covered_mask.sum()}/{V}, k={len(best_selected)}")
+                else:
+                    print(f"[it {it:02d}] New best (weighted): score={best_score:.3f}, "
+                          f"covered={best_covered_mask.sum()}/{V}, k={len(best_selected)}")
+        else:
+            no_improve += 1
+        if early_stop_no_improve is not None and no_improve >= early_stop_no_improve:
+            if verbose:
+                print(f"[it {it:02d}] Early stop after {no_improve} non-improving iterations.")
+            break
+
+    # convert mask back to set of indices if you need it elsewhere
+    best_covered = set(np.nonzero(best_covered_mask)[0].tolist())
+    return best_selected, best_covered, best_score
+
+
 # ---------------------------- Data loading ----------------------------
 
-def load_visible_by(yaml_path: str) -> Tuple[List[Set[int]], int]:
+def load_visible_by(yaml_path: str):
     """
-    Expects YAML with:
-      - voxel_count
-      - sensor_count
-      - pose_count
-      - visible_by: list[pose][voxel] -> list of sensor indices
     Returns:
-      sensor_sets: list of sets; sensor_sets[j] = set of voxel indices covered by sensor j across all poses
-      V: universe size (voxel_count)
+      sensor_sets: list[set[int]] where sensor_sets[j] is the set of voxels covered by sensor j (union across poses)
+      V: int (voxel_count)
+      raw: dict (full parsed YAML for optional fields like weights)
     """
     print(f"Loading visible_by from {yaml_path}...")
-    data = yaml.load(Path(yaml_path).read_bytes(), Loader=YLoader)
-    #data = yaml.safe_load(Path(yaml_path).read_text())
+    raw = yaml.load(Path(yaml_path).read_bytes(), Loader=YLoader)
     print("loaded YAML.")
-    V = int(data["voxel_count"])
-    P = int(data["pose_count"])
-    S = int(data["sensor_count"])
-    vis_by = data["visible_by"]  # shape [P][V] -> list[int]
+    V = int(raw["voxel_count"])
+    P = int(raw["pose_count"])
+    S = int(raw["sensor_count"])
+    vis_by = raw["visible_by"]  # shape [P][V] -> list[int]
 
     sensor_sets = [set() for _ in range(S)]
     for p in range(P):
@@ -71,7 +163,7 @@ def load_visible_by(yaml_path: str) -> Tuple[List[Set[int]], int]:
             for s in sens_list:
                 sensor_sets[int(s)].add(int(v))
 
-    return sensor_sets, V
+    return sensor_sets, V, raw
 
 
 # ---------------------------- Utilities ----------------------------
@@ -100,13 +192,6 @@ def one_swap_local_search(sensor_sets: List[Set[int]],
                           weights: Optional[np.ndarray] = None,
                           max_rounds: int = 100,
                           verbose: bool = False) -> Tuple[List[int], Set[int], float]:
-    """
-    Improve a given selection by swapping one sensor out and one in, greedily.
-    Stops when no 1-swap improves coverage or max_rounds reached.
-
-    Returns:
-      selected_best (sorted list), covered_best (set), best_score (float)
-    """
     selected = list(selected)
     selected_set = set(selected)
     covered = union_sets(selected, sensor_sets)
@@ -162,12 +247,15 @@ def one_swap_local_search(sensor_sets: List[Set[int]],
 # ---------------------------- GRASP ----------------------------
 
 def grasp_one(seed, sensor_sets, V, k, rcl_size, local_rounds, weights):
-    sel, cov, score = grasp_max_coverage(
-        sensor_sets, V, k,
-        rcl_size=rcl_size, iters=1,  # one restart per process
+    print("[Worker] Starting GRASP with seed", seed)
+    A = build_sensor_csr(sensor_sets, V)
+    sel, cov, score = grasp_max_coverage_sparse(
+        A, V, k,
+        rcl_size=rcl_size, iters=1,
         weights=weights, local_search_rounds=local_rounds,
         early_stop_no_improve=None, verbose=False, seed=seed
     )
+    print(f"[Worker] Finished seed {seed}: score={score:.3f}, covered={len(cov)}/{V}, k={len(sel)}")
     return (score, sel, cov, seed)
 
 def parallel_grasp(sensor_sets, V, k, iters, rcl_size=5, local_rounds=100, weights=None, procs=None):
@@ -215,15 +303,8 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
                        early_stop_no_improve: Optional[int] = None,
                        verbose: bool = True,
                        seed: Optional[int] = None) -> Tuple[List[int], Set[int], float]:
-    """
-    GRASP: randomized greedy construction + 1-swap local search, repeated.
-    - rcl_size: restricted candidate list size for randomized greedy
-    - iters: number of GRASP iterations
-    - early_stop_no_improve: stop if no improvement for this many iterations
+    print("Starting GRASP max coverage:")
 
-    Returns:
-      best_selected (list), best_covered (set), best_score (float)
-    """
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
@@ -243,7 +324,6 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
         remaining = set(range(n_sensors))
 
         for step in range(k):
-            # compute gains for all remaining
             gains = []
             for s in remaining:
                 new_vox = sensor_sets[s] - covered
@@ -254,7 +334,6 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
             if not gains:
                 break
 
-            # sort by gain and pick at random among top rcl_size
             gains.sort(key=lambda x: x[0], reverse=True)
             rcl = gains[:min(rcl_size, len(gains))]
             gain, s_pick, new_vox = random.choice(rcl)
@@ -264,10 +343,13 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
             remaining.remove(s_pick)
 
             if verbose:
-                print(f"[it {it:02d} | step {step+1:02d}] pick {s_pick} +{len(new_vox)} "
-                      f"(cum {len(covered)}/{universe_size})")
+                if weights is None:
+                    print(f"[it {it:02d} | step {step+1:02d}] pick {s_pick} +{len(new_vox)} "
+                          f"(cum {len(covered)}/{universe_size})")
+                else:
+                    print(f"[it {it:02d} | step {step+1:02d}] pick {s_pick} +w{gain:.3f} "
+                          f"(cum_w {weighted_size(covered, weights):.3f})")
 
-            # optional early exit if fully covered
             if len(covered) == universe_size:
                 break
 
@@ -282,8 +364,11 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
             best_selected, best_covered, best_score = sel2, cov2, score2
             no_improve = 0
             if verbose:
-                print(f"[it {it:02d}] New best: score={best_score:.3f}, "
-                      f"covered={len(best_covered)}/{universe_size}, k={len(best_selected)}")
+                if weights is None:
+                    print(f"[it {it:02d}] New best (unweighted): {len(best_covered)}/{universe_size}, k={len(best_selected)}")
+                else:
+                    print(f"[it {it:02d}] New best (weighted): score={best_score:.3f}, "
+                          f"covered={len(best_covered)}/{universe_size}, k={len(best_selected)}")
         else:
             no_improve += 1
 
@@ -299,15 +384,22 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="GRASP for maximum coverage (sensor selection).")
-    ap.add_argument("--yaml_path", type=str, default = "rand_heatmap.yaml", help="Input YAML (with visible_by, voxel_count, etc.)")
-    ap.add_argument("--k", type=int, default = 20, help="Sensor budget (max number of sensors).")
+    ap.add_argument("--yaml_path", type=str, default="ur_sensor_sim/tmp/combined_heatmap.yaml",
+                    help="Input YAML (with visible_by, voxel_count, etc.)")
+    ap.add_argument("--k", type=int, default=20, help="Sensor budget (max number of sensors).")
     ap.add_argument("--iters", type=int, default=30, help="GRASP iterations (restarts).")
     ap.add_argument("--rcl-size", type=int, default=5, help="Restricted candidate list size.")
     ap.add_argument("--local-rounds", type=int, default=100, help="Max 1-swap local search rounds.")
     ap.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility.")
     ap.add_argument("--verbose", action="store_true", help="Print per-step logs.")
-    ap.add_argument("--weights", type=str, default=None,
-                    help="Optional .npy file with per-voxel weights (float, shape (V,)).")
+
+    # Weights sources / behavior:
+    ap.add_argument("--weights", type=str, default="ur_sensor_sim/tmp/capsule_weighted.npy",
+                    help="Optional .npy file with per-voxel weights (float, shape (V,)). If provided, overrides YAML.")
+    ap.add_argument("--yaml-weight-key", type=str, default="weights",
+                    help="YAML key for per-voxel weights (default: 'weights').")
+    ap.add_argument("--normalize-weights", action="store_true",
+                    help="Normalize loaded weights to [0,1] before optimization.")
     ap.add_argument("--early-stop", type=int, default=None,
                     help="Stop GRASP if no improvement for N iterations.")
     ap.add_argument("--export-json", type=str, default=None,
@@ -319,15 +411,40 @@ def main():
     start = time.time()
     args = parse_args()
 
-    sensor_sets, V = load_visible_by(args.yaml_path)
+    sensor_sets, V, raw = load_visible_by(args.yaml_path)
     print(f"Loaded sensor sets from {args.yaml_path}: {len(sensor_sets)} sensors, {V} voxels.")
 
+    # -------- load weights (priority: external .npy > YAML key) --------
     weights = None
+    source = None
+
     if args.weights is not None:
-        weights_array = np.load(args.weights)
-        if weights_array.shape != (V,):
-            raise ValueError(f"weights shape {weights_array.shape} != (V,) = ({V},)")
-        weights = weights_array.astype(np.float64)
+        arr = np.load(args.weights)
+        if arr.shape != (V,):
+            raise ValueError(f"weights shape {arr.shape} != (V,) = ({V},)")
+        weights = arr.astype(np.float64)
+        source = f".npy ({args.weights})"
+    else:
+        key = args.yaml_weight_key
+        if key in raw:
+            arr = np.asarray(raw[key], dtype=np.float64)
+            if arr.shape != (V,):
+                raise ValueError(f"YAML '{key}' length {arr.shape} != V ({V})")
+            weights = arr
+            source = f"YAML['{key}']"
+
+    if weights is not None and args.normalize_weights:
+        wmin, wmax = float(np.min(weights)), float(np.max(weights))
+        if wmax > wmin:
+            weights = (weights - wmin) / (wmax - wmin)
+        else:
+            weights = np.zeros_like(weights)
+        source = (source or "weights") + " + normalized[0,1]"
+
+    if source:
+        print(f"Using weighted objective from {source}.")
+    else:
+        print("No weights provided/found; using UNWEIGHTED coverage.")
 
     if args.verbose:
         print(f"Loaded {len(sensor_sets)} sensors, {V} voxels from {args.yaml_path}")
@@ -360,7 +477,7 @@ def main():
             "selected_sensors": best_sel,
             "covered_voxels_count": covered_count,
             "coverage_fraction": coverage_frac,
-            "objective": best_score if weights is not None else covered_count,
+            "objective": float(best_score if weights is not None else covered_count),
             "k": args.k,
             "iters": args.iters,
             "rcl_size": args.rcl_size,
@@ -368,6 +485,7 @@ def main():
             "seed": args.seed,
             "yaml_path": os.path.abspath(args.yaml_path),
             "weights_path": os.path.abspath(args.weights) if args.weights else None,
+            "weights_source": source,
         }
         Path(args.export_json).write_text(json.dumps(out, indent=2))
         print(f"Saved JSON to: {args.export_json}")
