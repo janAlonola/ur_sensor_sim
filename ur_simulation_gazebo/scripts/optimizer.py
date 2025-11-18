@@ -384,9 +384,9 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="GRASP for maximum coverage (sensor selection).")
-    ap.add_argument("--yaml_path", type=str, default="ur_sensor_sim/tmp/combined_heatmap.yaml",
+    ap.add_argument("--yaml_path", type=str, default="rand_heatmap.yaml",
                     help="Input YAML (with visible_by, voxel_count, etc.)")
-    ap.add_argument("--k", type=int, default=20, help="Sensor budget (max number of sensors).")
+    ap.add_argument("--k", type=int, default=25, help="Sensor budget (max number of sensors).")
     ap.add_argument("--iters", type=int, default=30, help="GRASP iterations (restarts).")
     ap.add_argument("--rcl-size", type=int, default=5, help="Restricted candidate list size.")
     ap.add_argument("--local-rounds", type=int, default=100, help="Max 1-swap local search rounds.")

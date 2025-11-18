@@ -135,7 +135,7 @@ def deg2rad(vals):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--candidates", default="ur_sensor_sim/tmp/weighted_poses", help="Path to candidates.yaml")
+    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml", help="Path to workspace_voxels.yaml")
     ap.add_argument("--out", default="weighted_heatmap.yaml", help="Output YAML file")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
@@ -147,11 +147,11 @@ def main():
     vox  = load_yaml(args.voxels)
     sensors = cand["candidates"]
     #random
-    #indices = [982, 765, 787, 999, 145, 95, 884, 719, 316, 829, 657, 496, 99, 127, 1028, 964, 669, 989, 395, 1120]
+    indices = [11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898, 204, 130, 590, 380, 298]
     #optimized
     #indices = [11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898]#[0, 15, 76, 285, 296, 311, 367, 368, 389, 392, 626, 824, 851, 858, 859, 861, 933, 942, 995, 1118] #[452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860]
     # Extract those sensors
-    #sensors = [sensors[i] for i in indices]
+    sensors = [sensors[i] for i in indices]
     #[452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
     voxels = np.array(vox["voxels"], dtype=np.float32)
 

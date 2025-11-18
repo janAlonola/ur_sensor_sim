@@ -24,7 +24,7 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(description="Publish joint poses -> record centers from TF")
     ap.add_argument("--poses-yaml", default="ur_sensor_sim/tmp/poses.yaml", help="poses.yaml with joint_names & poses[].joints_rad")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/poses_2.yaml", help="Output centers.yaml")
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/centers.yaml", help="Output centers.yaml")
     ap.add_argument("--tf-target", default="world", help="Target frame for centers")
     ap.add_argument("--forearm-frame", default="forearm_link", help="Forearm/Elbow frame name")
     ap.add_argument("--tcp-frame", default="tool0", help="TCP frame name")

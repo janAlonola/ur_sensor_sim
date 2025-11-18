@@ -149,8 +149,8 @@ def infer_pose_name_from_voxel_doc_or_filename(vdoc: dict, stem: str) -> str | N
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/candidates.yaml",
-                    help="Path to candidates.yaml (single file)")
+    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/selected_candidates.yaml",
+                    help="Path to sel_candidates.yaml (single file)")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/weighted_poses",
                     help="Directory containing per-pose voxel YAMLs")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
