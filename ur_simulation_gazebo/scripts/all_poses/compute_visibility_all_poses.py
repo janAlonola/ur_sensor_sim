@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-compute_visibility_batch_with_poses.py
+compute_visibility_batch_over_poses.py
 
 Inputs:
-  --candidates  : path to single candidates.yaml (with {candidates:[...]})
-  --voxels      : folder of voxel YAMLs (each with 'voxels': [[x,y,z], ...])
-                  ideally each also has weighting.pose_name set (e.g., "b1_w2")
-  --poses       : poses.yaml (as provided in the prompt)
-  --out         : output folder. One <stem>_heatmap.yaml per input voxel YAML.
+  --candidates : single candidates.yaml (with {candidates:[...]})
+  --voxels     : single voxel YAML (with 'voxels': [[x,y,z], ...])
+  --poses      : poses.yaml (list of named poses)
+  --out        : output folder. One <vox_stem>_<pose_name>_heatmap.yaml per pose.
 
 Notes:
   - Sensor local +Z is the viewing direction.
   - Symmetric cone FOV (--fov), range cutoff (--max-range).
-  - Sensors are transformed through URDF FK for the selected pose.
-  - This version supports occlusion via trimesh raycasting and runs in parallel.
+  - Sensors are transformed through URDF FK for each pose.
+  - Occlusion with trimesh raycasting.
+  - Multiprocessing over poses.
 """
 
 import argparse
@@ -28,8 +28,9 @@ from transforms3d.euler import euler2mat, mat2euler
 from urdfpy import URDF
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
+import time
 
-# numpy compat (older code sometimes expects these)
+# numpy compat
 if not hasattr(np, 'float'):
     np.float = float
     np.int = int
@@ -42,10 +43,6 @@ def load_yaml(p: Path):
 
 def save_yaml(p: Path, data: dict):
     p.write_text(yaml.safe_dump(data, sort_keys=False))
-
-def list_yaml_files(folder: Path):
-    return sorted([x for x in folder.iterdir()
-                   if x.is_file() and x.suffix.lower() in (".yaml", ".yml")])
 
 def rpy_to_matrix(rpy):
     return t3d.euler.euler2mat(*rpy, axes='sxyz')
@@ -136,45 +133,39 @@ def build_robot_meshes_world(urdf: URDF, joint_cfg: dict, base_frame: str | None
 
     return robot_meshes
 
-def ray_blocked_by_robot(origin, target, robot_meshes, eps=1e-4):
+def build_robot_mesh_world_combined(urdf: URDF, joint_cfg: dict, base_frame: str | None):
     """
-    Return True if the segment origin->target intersects any robot mesh
-    before reaching the target.
+    Build a single combined Trimesh for the robot in the given joint_cfg,
+    in base_frame coordinates.
     """
-    direction = target - origin
-    length = np.linalg.norm(direction)
-    if length < eps:
-        return False
+    robot_meshes = build_robot_meshes_world(urdf, joint_cfg, base_frame)
+    if not robot_meshes:
+        return None
+    return trimesh.util.concatenate(robot_meshes)
 
-    direction /= length
-    ray_origins = origin[None, :]        # (1, 3)
-    ray_directions = direction[None, :]  # (1, 3)
-
-    for mesh in robot_meshes:
-        locations, index_ray, index_tri = mesh.ray.intersects_location(
-            ray_origins,
-            ray_directions,
-            multiple_hits=False
-        )
-        if len(locations) > 0:
-            hit = locations[0]
-            dist_hit = np.linalg.norm(hit - origin)
-            if dist_hit < length - eps:
-                return True
-
-    return False
-
-def compute_visibility_with_occlusion(voxels: np.ndarray, sensors: list,
-                                      robot_meshes: list,
-                                      max_range=1.5, fov_deg=60.0):
+def compute_visibility_with_occlusion_batched(voxels: np.ndarray,
+                                              sensors: list,
+                                              robot_mesh: trimesh.Trimesh | None,
+                                              max_range=1.5,
+                                              fov_deg=60.0,
+                                              eps=1e-4,
+                                              pose_name: str | None=None):
     """
-    Like compute_visibility, but also checks line-of-sight against robot meshes.
+    Occlusion-aware visibility using a *single* combined robot mesh and
+    batched raycasts per sensor.
     """
     Nvox = len(voxels)
     Nsens = len(sensors)
     visible = np.zeros((Nvox, Nsens), dtype=bool)
 
+    if robot_mesh is None:
+        # Fallback: no robot geometry -> no occlusion
+        return compute_visibility(voxels, sensors, max_range=max_range, fov_deg=fov_deg)
+
     half_fov_cos = math.cos(math.radians(fov_deg) / 2.0)
+
+    t0 = time.time()                     # NEW: start timing
+    last_print = t0                      # NEW: last time we printed
 
     for j, s in enumerate(sensors):
         origin = np.array(s["xyz"], dtype=float)
@@ -190,10 +181,44 @@ def compute_visibility_with_occlusion(voxels: np.ndarray, sensors: list,
         in_range = dist <= s.get("max_range", max_range)
 
         candidates = np.where(in_fov & in_range)[0]
+        if candidates.size == 0:
+            continue
 
-        for i in candidates:
-            if not ray_blocked_by_robot(origin, voxels[i], robot_meshes):
-                visible[i, j] = True
+        # Batched ray origins & directions
+        origins = np.repeat(origin[None, :], candidates.size, axis=0)
+        directions = dirv[candidates]
+
+        # One big ray query for all candidate voxels
+        locations, index_ray, index_tri = robot_mesh.ray.intersects_location(
+            origins,
+            directions,
+            multiple_hits=False
+        )
+
+        blocked = np.zeros(candidates.size, dtype=bool)
+
+        if len(locations) > 0:
+            # Distance from sensor to voxel (ground truth)
+            voxel_dists = dist[candidates][index_ray]
+            # Distance from sensor to hit
+            hit_dists = np.linalg.norm(locations - origins[index_ray], axis=1)
+
+            # Mark rays as blocked if hit is before voxel
+            mask = hit_dists < voxel_dists - eps
+            blocked[index_ray[mask]] = True
+
+        # Voxels that are in FOV+range and not blocked
+        visible[candidates[~blocked], j] = True
+
+        now = time.time()
+            # print at most every ~5 seconds or at fixed sensor intervals
+        if (now - last_print > 5.0) or ((j + 1) % 50 == 0) or (j == 0):
+            elapsed = now - t0
+            avg_per_sensor = elapsed / (j + 1)
+            name = pose_name if pose_name is not None else "pose"
+            print(f"[PROGRESS] {name}: {j+1}/{Nsens} sensors "
+                    f"| elapsed={elapsed:.1f}s | avg_per_sensor={avg_per_sensor:.3f}s")
+            last_print = now
 
     return visible
 
@@ -228,17 +253,6 @@ def load_pose_table(poses_yaml: Path, urdf_joint_suffix="_joint"):
         raise ValueError("No poses found in poses.yaml")
     return pose_to_cfg, urdf_names
 
-def infer_pose_name_from_voxel_doc_or_filename(vdoc: dict, stem: str) -> str | None:
-    # 1) from metadata
-    pose_meta = (vdoc.get("weighting") or {}).get("pose_name")
-    if isinstance(pose_meta, str) and pose_meta.strip():
-        return pose_meta.strip()
-    # 2) filename like b3_w2, B5_W1, etc.
-    m = re.search(r"(?i)\b(b\d+_w\d+)\b", stem)
-    if m:
-        return m.group(1).lower()
-    return None
-
 # ---------- globals used by workers ----------
 
 GLOBAL_URDF = None
@@ -248,6 +262,10 @@ GLOBAL_BASE_FRAME = None
 GLOBAL_FOV = None
 GLOBAL_MAX_RANGE = None
 GLOBAL_OUT_DIR = None
+GLOBAL_VOXELS = None
+GLOBAL_VOXEL_SIZE = None
+GLOBAL_VOXEL_WEIGHTS = None
+GLOBAL_VOXEL_STEM = None
 
 def init_worker(urdf_path: str,
                 sensors_src: list,
@@ -255,12 +273,17 @@ def init_worker(urdf_path: str,
                 base_frame: str,
                 fov: float,
                 max_range: float,
-                out_dir: str):
+                out_dir: str,
+                voxels: np.ndarray,
+                voxel_size,
+                voxel_weights,
+                voxel_stem: str):
     """
     Initializer for each worker process: loads URDF once, stores shared data.
     """
     global GLOBAL_URDF, GLOBAL_SENSORS_SRC, GLOBAL_POSE_TO_CFG
     global GLOBAL_BASE_FRAME, GLOBAL_FOV, GLOBAL_MAX_RANGE, GLOBAL_OUT_DIR
+    global GLOBAL_VOXELS, GLOBAL_VOXEL_SIZE, GLOBAL_VOXEL_WEIGHTS, GLOBAL_VOXEL_STEM
 
     GLOBAL_URDF = URDF.load(urdf_path)
     GLOBAL_SENSORS_SRC = sensors_src
@@ -270,24 +293,22 @@ def init_worker(urdf_path: str,
     GLOBAL_MAX_RANGE = max_range
     GLOBAL_OUT_DIR = Path(out_dir)
 
-def process_voxel_file(vf_path_str: str):
+    GLOBAL_VOXELS = voxels
+    GLOBAL_VOXEL_SIZE = voxel_size
+    GLOBAL_VOXEL_WEIGHTS = voxel_weights
+    GLOBAL_VOXEL_STEM = voxel_stem
+
+def process_pose(pose_name: str):
     """
-    Worker function: processes a single voxel YAML and writes its heatmap.
+    Worker function: compute visibility for a single pose, write heatmap.
     Returns summary info for logging.
     """
-    vf = Path(vf_path_str)
-    vdoc = load_yaml(vf)
-    voxels = np.asarray(vdoc["voxels"], dtype=np.float32)
-
-    # Choose pose
-    pose_name = infer_pose_name_from_voxel_doc_or_filename(vdoc, vf.stem)
-    if pose_name is None or pose_name not in GLOBAL_POSE_TO_CFG:
-        pose_name = next(iter(GLOBAL_POSE_TO_CFG.keys()))
+    start = time.time()
 
     joint_cfg = GLOBAL_POSE_TO_CFG[pose_name]
 
-    # Build robot meshes for this pose in base_frame
-    robot_meshes = build_robot_meshes_world(
+    # Robot mesh for this pose
+    robot_mesh = build_robot_mesh_world_combined(
         GLOBAL_URDF,
         joint_cfg,
         base_frame=GLOBAL_BASE_FRAME
@@ -309,39 +330,41 @@ def process_voxel_file(vf_path_str: str):
         })
 
     # Visibility with occlusion
-    visible = compute_visibility_with_occlusion(
-        voxels,
+    visible = compute_visibility_with_occlusion_batched(
+        GLOBAL_VOXELS,
         sensors_world,
-        robot_meshes,
+        robot_mesh,
         max_range=GLOBAL_MAX_RANGE,
         fov_deg=GLOBAL_FOV,
+        pose_name=pose_name
     )
 
     coverage = visible.sum(axis=1)
-    voxel_to_sensors = [np.nonzero(visible[i])[0].tolist() for i in range(len(voxels))]
+    voxel_to_sensors = [np.nonzero(visible[i])[0].tolist()
+                        for i in range(len(GLOBAL_VOXELS))]
 
     out_doc = {
-        "voxel_size_m": vdoc.get("voxel_size_m"),
-        "voxel_count": int(len(voxels)),
+        "voxel_size_m": GLOBAL_VOXEL_SIZE,
+        "voxel_count": int(len(GLOBAL_VOXELS)),
         "sensor_count": int(len(sensors_world)),
         "pose_count": 1,
         "pose_name": pose_name,
         "fov_deg": float(GLOBAL_FOV),
         "max_range_m": float(GLOBAL_MAX_RANGE),
-        "voxels": voxels.tolist(),
-        **({"weights": vdoc["weights"]} if "weights" in vdoc else {}),
+        "voxels": GLOBAL_VOXELS.tolist(),
+        **({"weights": GLOBAL_VOXEL_WEIGHTS} if GLOBAL_VOXEL_WEIGHTS is not None else {}),
         "coverage": coverage.astype(int).tolist(),
         "visible_by": voxel_to_sensors,
     }
 
-    out_path = GLOBAL_OUT_DIR / f"{vf.stem}_heatmap.yaml"
+    out_path = GLOBAL_OUT_DIR / f"{GLOBAL_VOXEL_STEM}_{pose_name}_heatmap.yaml"
     save_yaml(out_path, out_doc)
 
     unseen = int((coverage == 0).sum())
     mean_cov = float(coverage.mean())
+    elapsed = time.time() - start
 
-    # Return info so main process can print clean logs
-    return vf.name, out_path.name, pose_name, mean_cov, unseen
+    return pose_name, out_path.name, mean_cov, unseen, elapsed
 
 # --------------- main ---------------
 
@@ -349,12 +372,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/selected_candidates.yaml",
                     help="Path to sel_candidates.yaml (single file)")
-    ap.add_argument("--voxels", default="ur_sensor_sim/tmp/weighted_poses",
-                    help="Directory containing per-pose voxel YAMLs")
+    ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml",
+                    help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
-                    help="poses.yaml with joint_names and poses (as provided)")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/occlusion_heatmaps",
-                    help="Output directory (one heatmap per voxel YAML)")
+                    help="poses.yaml with joint_names and poses")
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/occlusion_heatmaps_best",
+                    help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
     ap.add_argument("--urdf", default="ur_sensor_sim/tmp/ur10.urdf", help="URDF path")
@@ -364,14 +387,14 @@ def main():
     args = ap.parse_args()
 
     cand_path = Path(args.candidates)
-    vox_dir   = Path(args.voxels)
+    vox_path  = Path(args.voxels)
     poses_path= Path(args.poses)
     out_dir   = Path(args.out)
 
     if not cand_path.is_file():
         raise SystemExit(f"--candidates must be a file: {cand_path}")
-    if not vox_dir.is_dir():
-        raise SystemExit(f"--voxels must be a directory: {vox_dir}")
+    if not vox_path.is_file():
+        raise SystemExit(f"--voxels must be a single YAML file: {vox_path}")
     if not poses_path.is_file():
         raise SystemExit(f"--poses must be a file: {poses_path}")
 
@@ -379,24 +402,52 @@ def main():
 
     # Load inputs (once, then shared to workers)
     cand_doc = load_yaml(cand_path)
-    sensors_src = cand_doc["candidates"]
+    sensors = cand_doc["candidates"]
+    indices = [
+    0,
+    29,
+    58,
+    62,
+    65,
+    225,
+    243,
+    247,
+    302,
+    304,
+    324,
+    501,
+    598,
+    645,
+    683,
+    684,
+    688,
+    702,
+    705,
+    909
+  ]
+    sensors_src = [sensors[i] for i in indices]
     print(f"[INFO] Loaded {len(sensors_src)} candidate sensors from {cand_path.name}")
 
+    vdoc = load_yaml(vox_path)
+    voxels = np.asarray(vdoc["voxels"], dtype=np.float32)
+    voxel_size = vdoc.get("voxel_size_m")
+    voxel_weights = vdoc.get("weights", None)
+    voxel_stem = vox_path.stem
+
     pose_to_cfg, urdf_joint_names = load_pose_table(poses_path)
-    print(f"[INFO] Loaded {len(pose_to_cfg)} poses from {poses_path.name}: {sorted(pose_to_cfg.keys())}")
+    pose_names = list(pose_to_cfg.keys())
+    print(f"[INFO] Loaded {len(pose_names)} poses from {poses_path.name}: {pose_names}")
+    print(f"[INFO] 1 voxel map from {vox_path.name}, {len(voxels)} voxels")
+    print(f"[INFO] Output dir: {out_dir}")
+    print(f"[INFO] Using up to {args.workers} worker processes")
 
-    voxel_files = list_yaml_files(vox_dir)
-    if not voxel_files:
-        raise SystemExit(f"No voxel YAMLs found in {vox_dir}")
+    # Limit workers to number of poses
+    workers = min(args.workers, len(pose_names))
 
-    print(f"[INFO] Processing {len(voxel_files)} voxel maps from {vox_dir} → {out_dir}")
-    print(f"[INFO] Using {args.workers} worker processes")
-
-    # Parallel execution
-    vf_paths = [str(vf) for vf in voxel_files]
+    t0 = time.time()
 
     with ProcessPoolExecutor(
-        max_workers=args.workers,
+        max_workers=workers,
         initializer=init_worker,
         initargs=(args.urdf,
                   sensors_src,
@@ -404,13 +455,26 @@ def main():
                   args.base_frame,
                   args.fov,
                   args.max_range,
-                  str(out_dir))
+                  str(out_dir),
+                  voxels,
+                  voxel_size,
+                  voxel_weights,
+                  voxel_stem)
     ) as exe:
-        futures = {exe.submit(process_voxel_file, p): p for p in vf_paths}
+        futures = {exe.submit(process_pose, name): name for name in pose_names}
+
+        done = 0
+        total = len(futures)
 
         for fut in as_completed(futures):
-            vf_name, out_name, pose_name, mean_cov, unseen = fut.result()
-            print(f"[OK] {vf_name} → {out_name} | pose={pose_name} | mean={mean_cov:.2f} | unseen={unseen}")
+            pose_name, out_name, mean_cov, unseen, elapsed = fut.result()
+            done += 1
+            total_elapsed = time.time() - t0
+            avg_per_pose = total_elapsed / done
+            print(f"[OK] pose={pose_name} → {out_name} | mean={mean_cov:.2f} "
+                  f"| unseen={unseen} | pose_time={elapsed:.1f}s")
+            print(f"[TIME] processed {done}/{total} poses | "
+                  f"elapsed={total_elapsed:.1f}s | avg_per_pose={avg_per_pose:.1f}s")
 
 if __name__ == "__main__":
     main()
