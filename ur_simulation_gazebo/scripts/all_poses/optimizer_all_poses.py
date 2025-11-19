@@ -188,12 +188,17 @@ def objective_from_masks(covered_p: np.ndarray, W: np.ndarray,
         return float((WT * covered_p.astype(np.float32)).sum())
 
     elif mode == "softmin":
-        # c in {0,1}, approximate min via power-mean with negative exponent
-        q = -1.0 / max(1e-6, float(softmin_temp))
-        c = covered_p.astype(np.float32)             # (P,V)
-        pm = (np.mean(np.power(np.clip(c, 1e-6, 1.0), q), axis=0) ** (1.0 / q))  # (V,)
-        wbar = np.mean(W, axis=1)                    # (V,)
-        return float((wbar * pm).sum())
+        tau = max(1e-6, float(softmin_temp))
+        # m[v] = number of poses that cover voxel v
+        m = covered_p.sum(axis=0).astype(np.float32)           # (V,)
+        a = (P - m)                                            # uncovered-poses count
+        b = m                                                  # covered-poses count
+        # soft-min value per voxel
+        z = a + b * np.exp(-1.0 / tau)
+        z = np.clip(z, 1e-12, None)                            # guard against log(0)
+        f = -tau * np.log(z)                                   # (V,)
+        wbar = W.mean(axis=1).astype(np.float32)               # (V,)
+        return float((wbar * f).sum())
 
     elif mode == "frac":
         frac = covered_p.mean(axis=0)                # (V,)
@@ -495,16 +500,12 @@ def multipose_grasp(
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Optimize one sensor set over MANY poses (multi-pose objective).")
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/weighted_heatmaps",
-                    help="Heatmap YAML (with visible_by) OR directory of such YAMLs")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses/*.npy"],
-                    help="One or more .npy paths or globs (one per pose).")
-    ap.add_argument("--weights-agg", choices=["max","mean","softmax"], default="max",
-                    help="Aggregate pose-specific weights into one per-voxel vector.")
-    ap.add_argument("--weights-temp", type=float, default=0.5,
-                    help="Softmax temperature for --weights-agg=softmax.")
-    ap.add_argument("--normalize-weights", action="store_true",
-                    help="Normalize each pose’s weight vector to [0,1] before aggregating.")
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/weighted_heatmaps", help="Heatmap YAML (with visible_by) OR directory of such YAMLs")
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses/*.npy"], help="One or more .npy paths or globs (one per pose).")
+    # Die beiden Optionen hier sind für die Aggregation der Gewichte pro Pose zu einem einzigen Vektor pro Voxel (zurzeit unbenutzt)
+    ap.add_argument("--weights-agg", choices=["max","mean","softmax"], default="max", help="Aggregate pose-specific weights into one per-voxel vector.")
+    ap.add_argument("--weights-temp", type=float, default=0.5, help="Softmax temperature for --weights-agg=softmax.")
+    ap.add_argument("--normalize-weights", action="store_true", help="Normalize each pose’s weight vector to [0,1] before aggregating.")
 
     ap.add_argument("--objective", choices=["sum","softmin","frac"], default="sum",
                     help=("Multi-pose objective over poses: "
@@ -516,16 +517,16 @@ def parse_args():
     ap.add_argument("--frac-alpha", type=float, default=0.6,
                     help="Required pose fraction for --objective=frac (e.g., 0.7 means ≥70% of poses).")
 
-    ap.add_argument("--k", type=int, default=20, help="Sensor budget.")
+    ap.add_argument("--k", type=int, default=10, help="Sensor budget.")
     ap.add_argument("--iters", type=int, default=60, help="Greedy restarts.")
     ap.add_argument("--rcl-size", type=int, default=5, help="Restricted candidate list size.")
-    ap.add_argument("--seed", type=int, default=0, help="Random seed.")
+    ap.add_argument("--seed", type=int, default=42, help="Random seed.")
     ap.add_argument("--verbose", action="store_true", help="Verbose per-iter logs.")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_multipose.json",
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_multipose_10.json",
                     help="Save results JSON here.")
     ap.add_argument("--procs", type=int, default=None, help="Processes for parallel seeds (default: CPU count)")
 
-    ap.add_argument("--local-rounds", type=int, default=100, help="1-swap local search rounds.")
+    ap.add_argument("--local-rounds", type=int, default=500, help="1-swap local search rounds.")
     ap.add_argument("--ls-sample-in", type=int, default=None,
                     help="Optional subsample size for candidate 'add' set during 1-swap.")
 

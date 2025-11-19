@@ -110,7 +110,7 @@ TEMPLATE_TAIL = """
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/candidates.yaml", help="Path to candidates.yaml")
+    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/selected_candidates.yaml", help="Path to candidates.yaml")
     ap.add_argument("--out", default="ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro", help="Write to file (default: stdout)")
     ap.add_argument("--pick-n", type=int, default=10, help="How many sensors to place")
     ap.add_argument("--stride", type=int, default=40, help="Take every stride-th candidate (ignored if --indices given)")
@@ -128,7 +128,16 @@ def main():
 
 
 
-    sel = [11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898, 204, 130, 590, 380, 298] #[11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898]#[6, 118, 338, 375, 491, 560, 566, 581, 942, 1118] # [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
+    sel = [0,
+    17,
+    71,
+    195,
+    232,
+    324,
+    380,
+    429,
+    684,
+    700] #[11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898]#[6, 118, 338, 375, 491, 560, 566, 581, 942, 1118] # [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
     #= select_indices(len(cands), args.pick_n, args.stride, args.indices)
 
     # Build Xacro

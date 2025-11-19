@@ -384,7 +384,7 @@ def grasp_max_coverage(sensor_sets: List[Set[int]],
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="GRASP for maximum coverage (sensor selection).")
-    ap.add_argument("--yaml_path", type=str, default="rand_heatmap.yaml",
+    ap.add_argument("--yaml_path", type=str, default="ur_sensor_sim/tmp/weighted_heatmaps/b1_w1_heatmap.yaml",
                     help="Input YAML (with visible_by, voxel_count, etc.)")
     ap.add_argument("--k", type=int, default=25, help="Sensor budget (max number of sensors).")
     ap.add_argument("--iters", type=int, default=30, help="GRASP iterations (restarts).")
@@ -394,7 +394,7 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--verbose", action="store_true", help="Print per-step logs.")
 
     # Weights sources / behavior:
-    ap.add_argument("--weights", type=str, default="ur_sensor_sim/tmp/capsule_weighted.npy",
+    ap.add_argument("--weights", type=str, default="ur_sensor_sim/tmp/weighted_poses/b1_w1.npy",
                     help="Optional .npy file with per-voxel weights (float, shape (V,)). If provided, overrides YAML.")
     ap.add_argument("--yaml-weight-key", type=str, default="weights",
                     help="YAML key for per-voxel weights (default: 'weights').")
@@ -402,7 +402,7 @@ def parse_args() -> argparse.Namespace:
                     help="Normalize loaded weights to [0,1] before optimization.")
     ap.add_argument("--early-stop", type=int, default=None,
                     help="Stop GRASP if no improvement for N iterations.")
-    ap.add_argument("--export-json", type=str, default=None,
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_single_pose.json",
                     help="Optional path to save results JSON (selection, coverage, stats).")
     return ap.parse_args()
 
