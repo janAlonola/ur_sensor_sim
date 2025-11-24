@@ -16,7 +16,7 @@ class VoxelPointCloudPublisher(Node):
         super().__init__('voxel_pc2_publisher')
 
         # ---------------- params ----------------
-        self.declare_parameter('yaml_file', 'ur_sensor_sim/tmp/weighted_poses/b1_w1.yaml')
+        self.declare_parameter('yaml_file', 'ur_sensor_sim/tmp/weighted_poses_robot/b4_w1.yaml')
         self.declare_parameter('topic', '/workspace_voxels')
         self.declare_parameter('frame', 'world')
         self.declare_parameter('publish_rate', 1.0)

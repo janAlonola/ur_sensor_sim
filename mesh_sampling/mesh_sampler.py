@@ -232,12 +232,12 @@ def point_masked(p, link_name, masks):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--urdf', default="ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro", help='Path to URDF or Xacro file')
-    ap.add_argument('--spacing', type=float, default=0.03, help='Target spacing (m) between candidates')
+    ap.add_argument('--urdf', default="ur_sensor_sim/tmp/ur10.urdf", help='Path to URDF or Xacro file')
+    ap.add_argument('--spacing', type=float, default=0.02, help='Target spacing (m) between candidates')
     ap.add_argument('--offset', type=float, default=0.005, help='Offset (m) to place sensor origin along normal')
     ap.add_argument('--links', nargs='*', default=None, help='Subset of link names to sample (default: all visual/collision links)')
     ap.add_argument('--mask-yaml', default=None, help='Optional mask YAML to exclude areas per link')
-    ap.add_argument('--out', default="ur_sensor_sim/mesh_sampling/candidates.yaml", help='Output YAML path for candidates')
+    ap.add_argument('--out', default="ur_sensor_sim/mesh_sampling/big_candidates.yaml", help='Output YAML path for candidates')
     ap.add_argument('--use-collision', action='store_true', help='Sample collision meshes instead of visual if available')
     args = ap.parse_args()
 

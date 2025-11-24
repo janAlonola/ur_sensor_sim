@@ -376,7 +376,7 @@ def main():
                     help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
                     help="poses.yaml with joint_names and poses")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/occlusion_heatmaps_best",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/delte",
                     help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
@@ -404,25 +404,25 @@ def main():
     cand_doc = load_yaml(cand_path)
     sensors = cand_doc["candidates"]
     indices = [
-    0,
-    29,
-    58,
-    62,
+    60,
     65,
-    225,
+    103,
+    234,
+    240,
     243,
     247,
-    302,
+    249,
+    255,
     304,
-    324,
+    310,
+    483,
+    488,
     501,
-    598,
-    645,
+    554,
+    579,
     683,
     684,
-    688,
     702,
-    705,
     909
   ]
     sensors_src = [sensors[i] for i in indices]
