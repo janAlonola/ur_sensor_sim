@@ -179,7 +179,7 @@ class HeatmapViz(Node):
 def main():
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--yaml", default="ur_sensor_sim/tmp/delte/capsule_b1_w1_heatmap.yaml", help="Path to heatmap.yaml")
+    ap.add_argument("--yaml", default="ur_sensor_sim/tmp/delete/capsule_b1_w1_heatmap.yaml", help="Path to heatmap.yaml")
     ap.add_argument("--topic", default="/heatmap_points", help="Output topic name")
     args = ap.parse_args()
 

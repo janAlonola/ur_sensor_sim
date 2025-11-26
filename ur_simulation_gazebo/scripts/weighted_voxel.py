@@ -53,6 +53,14 @@ def _falloff(norm: np.ndarray, mode: str, gamma: float, alpha: float) -> np.ndar
         val = (1.0 - norm) ** float(gamma)
     elif mode == "exp":
         val = np.exp(-float(alpha) * norm)
+    elif mode == "sigmoid":
+        # k controls how steep the S is; reuse gamma as "steepness"
+        k = float(gamma) if gamma is not None else 8.0  # 8 is a decent default
+        # decreasing logistic:
+        # norm = 0   -> ~1
+        # norm = 0.5 -> ~0.5
+        # norm = 1   -> ~0
+        val = 1.0 / (1.0 + np.exp(k * (norm - 0.5)))
     else:
         raise ValueError(f"Unknown mode '{mode}'")
     return np.clip(val, 0.0, 1.0)
@@ -205,23 +213,23 @@ def main():
                     help="poses.yaml mapping pose_name -> joint angles")
     ap.add_argument("--base-frame", default="world",
                     help="Frame in which voxels are expressed and to which robot is transformed")
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_robot",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_giant_zeros",
                     help="Output directory (one YAML per pose)")
 
     # shaping
-    ap.add_argument("--robot-radius", type=float, default=0.10,
+    ap.add_argument("--robot-radius", type=float, default=0.2,
                     help="Inner radius r0 (m) where base falloff saturates")
     ap.add_argument("--r-max", type=float, default=None,
                     help="Outer radius for normalization (default: farthest effective distance)")
-    ap.add_argument("--mode", choices=["linear","gamma","exp"], default="gamma",
+    ap.add_argument("--mode", choices=["linear","gamma","exp", "sigmoid"], default="gamma",
                     help="Falloff mode")
-    ap.add_argument("--gamma", type=float, default=2.0,
+    ap.add_argument("--gamma", type=float, default=4.0,
                     help="Gamma exponent (mode=gamma)")
     ap.add_argument("--alpha", type=float, default=4.0,
                     help="Alpha slope (mode=exp)")
-    ap.add_argument("--min-w", type=float, default=0.05,
+    ap.add_argument("--min-w", type=float, default=0.01,
                     help="Lower clamp for weights (except zero-mask)")
-    ap.add_argument("--zero-inside", type=float, default=0.05,
+    ap.add_argument("--zero-inside", type=float, default=0.15,
                     help="Meters: if voxel is within this distance to robot surface, set weight=0")
     args = ap.parse_args()
 

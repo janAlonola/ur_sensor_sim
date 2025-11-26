@@ -16,10 +16,10 @@ def yaml_to_npy(yaml_path: Path, key: str, expected_V: int|None, out_dir: Path|N
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--weights-yaml", default="ur_sensor_sim/tmp/weighted_poses_robot",
+    ap.add_argument("--weights-yaml", default="ur_sensor_sim/tmp/weighted_poses_semi_zeros",
                     help="YAML path OR directory containing multiple YAMLs with weights")
     ap.add_argument("--key", default="weights", help="YAML key holding weights array")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/weighted_poses_robot",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/weighted_poses_semi_zeros",
                     help="Output .npy path (only when converting a single YAML). "
                          "If --weights-yaml is a directory, this is treated as an output directory.")
     ap.add_argument("--expected-V", type=int, default=None, help="Optional sanity check")
