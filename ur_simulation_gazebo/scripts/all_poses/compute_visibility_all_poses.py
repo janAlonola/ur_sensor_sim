@@ -370,13 +370,13 @@ def process_pose(pose_name: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/selected_candidates.yaml",
+    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/big_candidates.yaml",
                     help="Path to sel_candidates.yaml (single file)")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml",
                     help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
                     help="poses.yaml with joint_names and poses")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/delete",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility",
                     help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
@@ -402,9 +402,9 @@ def main():
 
     # Load inputs (once, then shared to workers)
     cand_doc = load_yaml(cand_path)
-    sensors = cand_doc["candidates"]
-    indices = [58, 62, 65, 225, 247, 302, 304, 309, 483, 501, 528, 598, 607, 643, 683, 684, 702, 705, 806, 812]
-    sensors_src = [sensors[i] for i in indices]
+    sensors_src = cand_doc["candidates"]
+    #indices = [58, 62, 65, 225, 247, 302, 304, 309, 483, 501, 528, 598, 607, 643, 683, 684, 702, 705, 806, 812]
+    #sensors_src = [sensors[i] for i in indices]
     print(f"[INFO] Loaded {len(sensors_src)} candidate sensors from {cand_path.name}")
 
     vdoc = load_yaml(vox_path)
