@@ -487,7 +487,7 @@ def multipose_grasp(
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Optimize one sensor set over MANY poses (multi-pose objective).")
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_ring",
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_ring_2_3",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + ring already stacked).")
     ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_bigger_zeros/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
@@ -504,14 +504,14 @@ def parse_args():
     ap.add_argument("--rcl-size", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_fixed_ring_25.json")
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_u_v_25.json")
     ap.add_argument("--procs", type=int, default=None)
 
     ap.add_argument("--local-rounds", type=int, default=1000)
     ap.add_argument("--ls-sample-in", type=int, default=None)
 
     # NEW: tell optimizer how many sensors at the end are fixed (the ring)
-    ap.add_argument("--fixed-tail", type=int, default=7,
+    ap.add_argument("--fixed-tail", type=int, default=16,
                     help="Number of fixed sensors appended at the end of the combined candidate set (ring size).")
 
     return ap.parse_args()
