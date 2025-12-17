@@ -110,7 +110,7 @@ TEMPLATE_TAIL = """
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/big_candidates_with_ring.yaml", help="Path to candidates.yaml")
+    ap.add_argument("--yaml", default="ur_sensor_sim/mesh_sampling/big_candidates_with_ring_copy.yaml", help="Path to candidates.yaml")
     ap.add_argument("--out", default="ur_sensor_sim/ur_tof_description/urdf/ur_with_tof.urdf.xacro", help="Write to file (default: stdout)")
     ap.add_argument("--pick-n", type=int, default=10, help="How many sensors to place")
     ap.add_argument("--stride", type=int, default=40, help="Take every stride-th candidate (ignored if --indices given)")
@@ -127,7 +127,7 @@ def main():
         sys.exit(2)
 
 
-    sel = [266, 275, 640, 647, 668, 876, 1440, 1456, 1471, 1921, 1933, 2022, 2629, 2658, 2659, 2660, 2661, 2662, 2663, 2664]
+    sel = [2658, 2659, 2660, 2661, 2662, 2663, 2664, 2665] # [266, 275, 640, 647, 668, 876, 1440, 1456, 1471, 1921, 1933, 2022, 2629, 2658, 2659, 2660, 2661, 2662, 2663, 2664]
     
   #[28, 58, 62, 65, 225, 247, 304, 324, 488, 501, 519, 601, 625, 645, 683, 684, 700, 702, 799, 812] #[11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898]#[6, 118, 338, 375, 491, 560, 566, 581, 942, 1118] # [452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860 ]
     #= select_indices(len(cands), args.pick_n, args.stride, args.indices)

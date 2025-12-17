@@ -41,29 +41,26 @@ N = 7
 OFFSET = 0.005   # use whatever you use elsewhere
 
 out = []
-CENTER = np.array([-0.10, 0.0, 0.048], dtype=float)   # [xc, yc, zc]  <-- yc/zc are what you need
-RADIUS = 0.05
+CENTER = np.array([-0.01, 0.0, -0.02], dtype=float)   # [xc, yc, zc]  <-- yc/zc are what you need
+RADIUS = 0.055
 
 for i in range(N):
     theta = i * (2.0 * math.pi / N)
 
-    # circle in YZ plane around X axis, centered at CENTER
-    circle_local = np.array([0.0, RADIUS * math.cos(theta), RADIUS * math.sin(theta)], dtype=float)
-    xyz_i = CENTER + circle_local
+    # ring in XY plane around Z axis
+    xyz_i = CENTER + np.array([RADIUS * math.cos(theta), RADIUS * math.sin(theta), 0.0], dtype=float)
 
-    # radial direction relative to the circle CENTER (not relative to 0,0,0)
-    radial = normalize(np.array([0.0, xyz_i[1] - CENTER[1], xyz_i[2] - CENTER[2]], dtype=float))
+    # radial in XY (outward from CENTER)
+    radial = normalize(np.array([ xyz_i[0] - CENTER[0], xyz_i[1] - CENTER[1], 0.0], dtype=float))
 
-    z_axis = radial   # outward
-    x_axis = np.array([1.0, 0.0, 0.0], dtype=float)
+    z_axis = radial                    # sensor +Z points outward (radial)
+    x_axis = np.array([0.0, 0.0, 1.0]) # choose +Z as a stable reference axis
     y_axis = normalize(np.cross(z_axis, x_axis))
     x_axis = normalize(np.cross(y_axis, z_axis))
+
     R_i = np.column_stack([x_axis, y_axis, z_axis])
-
     rpy_i = rpy_from_R_zyx(R_i)
-
-    # Your 'normal' equals R*[0,0,1] (sensor +Z in parent frame)
-    normal_i = normalize(R_i @ np.array([0.0, 0.0, 1.0], dtype=float))
+    normal_i = normalize(R_i @ np.array([0.0, 0.0, 1.0]))
 
     out.append({
         "link": PARENT_LINK,
@@ -72,6 +69,25 @@ for i in range(N):
         "normal": [float(normal_i[0]), float(normal_i[1]), float(normal_i[2])],
         "offset": float(OFFSET),
     })
+
+xyz_c = CENTER.copy()
+
+z_axis = np.array([0.0, 0.0, -1.0], dtype=float)      # sensor +Z points "outward" = -Z
+x_axis = np.array([1.0, 0.0,  0.0], dtype=float)      # any axis not parallel to z_axis
+y_axis = normalize(np.cross(z_axis, x_axis))
+x_axis = normalize(np.cross(y_axis, z_axis))
+
+R_c = np.column_stack([x_axis, y_axis, z_axis])
+rpy_c = rpy_from_R_zyx(R_c)
+normal_c = z_axis  # same as R_c @ [0,0,1]
+
+out.append({
+    "link": PARENT_LINK,
+    "xyz": [float(xyz_c[0]), float(xyz_c[1]), float(xyz_c[2])],
+    "rpy": [float(rpy_c[0]), float(rpy_c[1]), float(rpy_c[2])],
+    "normal": [float(normal_c[0]), float(normal_c[1]), float(normal_c[2])],
+    "offset": float(OFFSET),
+})
 
 with open("selected_candidates_forearm_ring.yaml", "w") as f:
     yaml.safe_dump(out, f, sort_keys=False)

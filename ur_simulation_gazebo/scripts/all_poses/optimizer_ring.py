@@ -489,7 +489,7 @@ def parse_args():
     ap = argparse.ArgumentParser(description="Optimize one sensor set over MANY poses (multi-pose objective).")
     ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_ring",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + ring already stacked).")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_semi_zeros/*.npy"],
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_bigger_zeros/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
     ap.add_argument("--weights-agg", choices=["max","mean","softmax"], default="max")
     ap.add_argument("--weights-temp", type=float, default=0.5)
@@ -499,12 +499,12 @@ def parse_args():
     ap.add_argument("--softmin-temp", type=float, default=0.3)
     ap.add_argument("--frac-alpha", type=float, default=0.6)
 
-    ap.add_argument("--k", type=int, default=20)
+    ap.add_argument("--k", type=int, default=25)
     ap.add_argument("--iters", type=int, default=60)
     ap.add_argument("--rcl-size", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_fixed_ring.json")
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/result_fixed_ring_25.json")
     ap.add_argument("--procs", type=int, default=None)
 
     ap.add_argument("--local-rounds", type=int, default=1000)
