@@ -156,6 +156,17 @@ def _weights_from_robot_mesh(
 ) -> tuple[np.ndarray, float, dict]:
     """
     Compute weights for each voxel based on distance to the robot's collision mesh.
+
+    Conceptually (for mode="gamma") this implements a 3-region weighting:
+      1) Zeroed band (unobservable / too close to mesh):
+           w = 0                     for d <= zero_inside
+      2) Plateau band near the robot:
+           w = 1                     for zero_inside < d <= r0
+         (this happens implicitly because d_eff = max(d - r0, 0) => d_eff=0,
+          norm=0, falloff(0)=1, and the min_w remap keeps it at 1)
+      3) Distance falloff region:
+           w = min_w + (1-min_w)*falloff(norm(d_eff))   for d > r0
+
     Returns:
       w       : array of weights, one per voxel
       r_total : effective outer radius used (r0 + r_max_eff)
@@ -164,28 +175,40 @@ def _weights_from_robot_mesh(
     N = len(voxels_xyz)
     d = np.empty(N, dtype=float)
 
-    # For each voxel, compute its distance 'd' to the robot surface. Chunked for memory.
+    # For each voxel, compute its true Euclidean distance 'd' to the robot collision surface.
+    # Chunked for memory/performance
     for start in range(0, N, chunk_size):
         end = min(start + chunk_size, N)
-        _, di, _ = closest_point(robot_mesh, voxels_xyz[start:end]) # distance from closest_point to voxel
+        _, di, _ = closest_point(robot_mesh, voxels_xyz[start:end])  # distance from voxel to closest point on mesh
         d[start:end] = di
 
-    # Treat everything closer than 'robot_radius' as "inside".
+    # Inner saturation radius r0 ("robot_radius"):
+    # We shift distances by r0 so that everything within r0 of the mesh maps to d_eff=0, which results in weight = 1
     r0 = max(0.0, float(robot_radius))
     d_eff = np.clip(d - r0, 0.0, None)
+
+    # Effective max distance for normalization:
+    # If r_max is not provided, use maximum observed d_eff in this pose.
+    # Otherwise interpret r_max as an absolute distance in the original distance domain,
+    # and convert it to the shifted domain by subtracting r0.
     if r_max is None:
         r_max_eff = float(np.max(d_eff)) if np.any(d_eff > 0) else 1e-6
     else:
         r_max_eff = max(1e-6, float(r_max - r0))
 
-    # Normalize distances into [0, 1] using r_max and apply a falloff function.
+    # Normalize shifted distances into [0,1] and apply the chosen falloff (e.g., gamma).
+    # For d <= r0: d_eff=0 -> norm=0 -> falloff(norm)=1 -> plateau at weight=1.
     norm = np.clip(d_eff / r_max_eff, 0.0, 1.0)
     w = _falloff(norm, mode, gamma, alpha)
-    # Clamp weights so they never go below min_w (except where we explicitly zero).
+
+    # Remap falloff output into [min_w, 1]:
+    # ensures far voxels do not drop below min_w (except where we explicitly zero them).
     min_w = float(np.clip(min_w, 0.0, 1.0))
     w = min_w + (1.0 - min_w) * w
     w = np.clip(w, min_w, 1.0)
-    # Optionally, force weight = 0 for voxels within 'zero_inside' of the robot.
+
+    # Optional: explicitly zero voxels extremely close to/inside the mesh:
+    # this overrides the plateau and sets w=0 for d <= zero_inside.
     zero_mask = None
     if zero_inside is not None and zero_inside > 0.0:
         zero_mask = d <= zero_inside
