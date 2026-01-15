@@ -424,7 +424,7 @@ def main():
                     help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
                     help="poses.yaml with joint_names and poses")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_ring_2_3",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_ring_vars",
                     help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
@@ -454,7 +454,7 @@ def main():
     # Load inputs (once, then shared to workers)
     cand_doc = load_yaml(cand_path)
     sensors = cand_doc["candidates"]
-    indices = [2658, 2659, 2660, 2661, 2662, 2663, 2664, 2665, 2666, 2667, 2668, 2669, 2670, 2671, 2672, 2673]
+    indices = range(2658, len(sensors))
     sensors_src = [sensors[i] for i in indices]
     print(f"[INFO] Loaded {len(sensors_src)} candidate sensors from {cand_path.name}")
 
