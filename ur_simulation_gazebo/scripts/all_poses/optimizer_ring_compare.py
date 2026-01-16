@@ -511,9 +511,9 @@ def combine_fixed(*lists: List[int]) -> List[int]:
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_ring_vars",
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + ring already stacked).")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_bigger_zeros/*.npy"],
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
 
     ap.add_argument("--objective", choices=["sum","softmin","frac"], default="sum")
@@ -533,7 +533,7 @@ def parse_args():
                     help="Path to ring_variants_index_map.json")
     ap.add_argument("--ring-base-index", type=int, default=2658,
                     help="Absolute start index of appended ring variants (local 0 maps to this).")
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiments",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiments_final",
                     help="Output folder for all results JSONs.")
 
     # how many top candidates per group to combine
@@ -567,14 +567,17 @@ def _infer_appended_offset(S_total: int, ring_map: dict) -> int:
 
 def main():
     args = parse_args()
-    if args.seed is not None:
-        random.seed(args.seed); np.random.seed(args.seed)
 
-    # 1) Load A_list, V, S (already combined big + appended ring variants)
+    # reproducibility (optional)
+    if args.deterministic:
+        random.seed(args.seed)
+        np.random.seed(args.seed)
+
+    # 1) Load A_list, V, S
     A_list, V, S, heatmap_files, P = load_all_pose_csrs(args.heatmaps)
     print(f"[INFO] Loaded CSRs: S={S}, V={V}, P={P}")
 
-    # 2) Load pose-specific weights W (V,P)
+    # 2) Load weights W (V,P)
     W, weight_files = load_weight_npys_matrix(
         args.weights_list, V,
         normalize=args.normalize_weights,
@@ -587,51 +590,38 @@ def main():
     ring_map = _load_ring_map(ring_map_path)
     print(f"[INFO] Loaded ring index map: {ring_map_path} with {len(ring_map)} rings")
 
-    # Infer where the appended ring block starts inside the *combined* candidate list
+    # 4) Map rel->abs
     base_offset = int(args.ring_base_index)
-    print(f"[INFO] Inferred appended ring block offset: base_offset={base_offset} "
-          f"(so rel=0 -> abs={base_offset})")
+    print(f"[INFO] Using ring_base_index={base_offset} (rel=0 -> abs={base_offset})")
 
     def abs_inds(ring_name: str) -> list[int]:
         rel = ring_map[ring_name]["indices"]
         return [base_offset + int(i) for i in rel]
 
-    # 4) Define the fixed “base” ring: vertical 15° all-tilt
-    base_ring = "forearm_vertical_tilt_all_15"
-    if base_ring not in ring_map:
-        raise SystemExit(f"Base ring '{base_ring}' not found in {ring_map_path}")
-    base_fixed = abs_inds(base_ring)
-    print(f"[INFO] Base ring fixed: {base_ring} | count={len(base_fixed)} | abs={base_fixed}")
-
-    # 5) Collect partner rings:
-    #    - all horizontals
-    #    - all upperarm rings (tilt_all, tilt_alt, notilt_x_*)
-    horizontal_rings = sorted([k for k in ring_map.keys() if k.startswith("forearm_horizontal_")])
-    upperarm_rings   = sorted([k for k in ring_map.keys() if k.startswith("upperarm_")])
-
-    partners = horizontal_rings + upperarm_rings
-    print(f"[INFO] Pairing base ring with {len(horizontal_rings)} horizontal + "
-          f"{len(upperarm_rings)} upperarm = {len(partners)} total partners")
-
-    # 6) Output folder
-    out_dir = Path(getattr(args, "out_dir", "ur_sensor_sim/tmp/ring_experiments/pairings_v15"))
+    # 5) Output dir
+    out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"[INFO] Output dir: {out_dir}")
 
-    # Optional: write a small summary CSV
+    summary_csv = out_dir / "summary_rings.csv"
     summary_rows = []
-    summary_csv = out_dir / "summary_pairings.csv"
 
-    # 7) Run all pairings: (vertical15_all) + (partner)
-    for partner in partners:
-        fixed = sorted(set(base_fixed + abs_inds(partner)))
-        tag = f"{base_ring}__{partner}"
-        print(f"\n=== [PAIR] {tag} | fixed={len(fixed)} | k={args.k} ===")
+    # 6) Run ONE experiment per ring
+    ring_names = sorted(ring_map.keys())
 
-        export_json = out_dir / f"{tag}.json"
+    for ring_name in ring_names:
+        fixed = sorted(set(abs_inds(ring_name)))
 
-        # IMPORTANT: You must pass fixed=... into your optimizer call.
-        # If your run_one_experiment already wraps that, call it there.
+        # sanity checks
+        if any((i < 0 or i >= S) for i in fixed):
+            print(f"[WARN] Skipping {ring_name}: fixed indices out of range [0,{S-1}]")
+            continue
+        if len(fixed) > args.k:
+            print(f"[WARN] Skipping {ring_name}: fixed_count={len(fixed)} > k={args.k}")
+            continue
+
+        print(f"\n=== [RING] {ring_name} | fixed={len(fixed)} | k={args.k} ===")
+
         sel, obj = parallel_multipose_grasp_pose_weights(
             A_list=A_list, W=W, k=args.k,
             iters=args.iters, rcl_size=args.rcl_size,
@@ -645,31 +635,45 @@ def main():
         )
 
         out = {
-            "experiment": tag,
-            "base_ring": base_ring,
-            "partner_ring": partner,
-            "fixed_sensors": fixed,
-            "selected_sensors": sel,
+            "name": ring_name,
+            "status": "ok",
             "objective_mode": args.objective,
             "objective_value": float(obj),
-            "S": S, "V": V, "P": P,
+            "selected_sensors": sel,
+            "k": int(args.k),
+
+            "fixed": fixed,
+            "fixed_count": int(len(fixed)),
+
+            "S": int(S), "V": int(V), "P": int(P),
             "heatmap_sources": heatmap_files,
             "weights_sources": weight_files,
-            "k": args.k, "iters": args.iters, "rcl_size": args.rcl_size,
-            "seed": args.seed,
-            "softmin_temp": args.softmin_temp,
-            "frac_alpha": args.frac_alpha,
+
+            "normalize_weights": bool(args.normalize_weights),
+            "iters": int(args.iters),
+            "rcl_size": int(args.rcl_size),
+            "local_rounds": int(args.local_rounds),
+            "ls_sample_in": (None if args.ls_sample_in is None else int(args.ls_sample_in)),
+            "ring_map": str(ring_map_path),
+            "ring_base_index": int(base_offset),
+
+            # note: the optimizer itself uses seeds = range(iters)
+            "seed": int(args.seed),
+            "deterministic": bool(args.deterministic),
         }
-        export_json.write_text(json.dumps(out, indent=2))
-        print(f"[OK] Saved: {export_json} | obj={obj:.3f}")
 
-        summary_rows.append((tag, base_ring, partner, len(fixed), float(obj)))
+        out_path = out_dir / f"{ring_name}.json"
+        out_path.write_text(json.dumps(out, indent=2))
+        print(f"[OK] Saved: {out_path} | obj={obj:.3f}")
 
-    # 8) Write summary
+        summary_rows.append((ring_name, len(fixed), float(obj)))
+
+    # 7) Write summary CSV
     with open(summary_csv, "w") as f:
-        f.write("experiment,base_ring,partner_ring,fixed_count,objective\n")
-        for row in summary_rows:
-            f.write(f"{row[0]},{row[1]},{row[2]},{row[3]},{row[4]:.10f}\n")
+        f.write("ring_name,fixed_count,objective\n")
+        for ring_name, fixed_count, obj in sorted(summary_rows, key=lambda x: x[2], reverse=True):
+            f.write(f"{ring_name},{fixed_count},{obj:.10f}\n")
+
     print(f"[OK] Wrote summary: {summary_csv}")
 
 

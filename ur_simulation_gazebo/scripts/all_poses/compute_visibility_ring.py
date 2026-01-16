@@ -418,13 +418,13 @@ def process_pose(pose_name: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/big_candidates_with_ring_copy.yaml",
+    ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/big_candidates_vars.yaml",
                     help="Path to big_candidates.yaml (single file)")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml",
                     help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
                     help="poses.yaml with joint_names and poses")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_ring_vars",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_vars",
                     help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")

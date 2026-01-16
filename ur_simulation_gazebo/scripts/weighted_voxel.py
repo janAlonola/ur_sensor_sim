@@ -223,6 +223,166 @@ def _weights_from_robot_mesh(
     }
     return w, float(r0 + r_max_eff), info
 
+# ---------------- Helpers ----------------
+
+def _compute_T_req_base(urdf: URDF, joint_cfg: dict, base_frame: str | None):
+    """
+    Returns T_req_base = (base_frame -> base_link) transform matrix, or None if base_frame is base_link / unspecified.
+    This matches the convention used in build_robot_mesh_world_combined().
+    """
+    if base_frame is None or base_frame == urdf.base_link.name:
+        return None
+
+    link_fk = urdf.link_fk(cfg=joint_cfg)
+    link_by_name = {L.name: L for L in urdf.links}
+    if base_frame not in link_by_name:
+        raise ValueError(f"--base-frame '{base_frame}' is not a URDF link name.")
+    req_link = link_by_name[base_frame]
+    T_base_req = link_fk[req_link]          # base_link -> base_frame
+    T_req_base = np.linalg.inv(T_base_req)  # base_frame -> base_link
+    return T_req_base
+
+
+def _link_position_in_base_frame(urdf: URDF, joint_cfg: dict, link_name: str, base_frame: str | None) -> np.ndarray:
+    """Return link origin position (xyz) expressed in base_frame coordinates."""
+    link_by_name = {L.name: L for L in urdf.links}
+    if link_name not in link_by_name:
+        raise ValueError(f"Link '{link_name}' not found in URDF. Available example: {list(link_by_name)[:10]} ...")
+
+    link_fk = urdf.link_fk(cfg=joint_cfg)   # base_link -> link
+    T_base_link = link_fk[link_by_name[link_name]]
+
+    T_req_base = _compute_T_req_base(urdf, joint_cfg, base_frame)
+    if T_req_base is None:
+        T_req_link = T_base_link            # base_link frame (== base_frame)
+    else:
+        T_req_link = T_req_base @ T_base_link  # base_frame -> link
+
+    return T_req_link[:3, 3].astype(float)
+
+
+def _pick_first_existing_link(urdf: URDF, candidates: list[str]) -> str | None:
+    names = {L.name for L in urdf.links}
+    for c in candidates:
+        if c in names:
+            return c
+    return None
+
+
+def _default_ur_chain_links(urdf: URDF, tcp_link: str) -> list[str]:
+    """
+    UR-ish defaults. We only keep those that exist in the provided URDF.
+    Ensures last element is tcp_link if possible.
+    """
+    names = {L.name for L in urdf.links}
+    # Typical UR10 link names
+    candidates = [
+        "base_link",
+        "shoulder_link",
+        "upper_arm_link",
+        "forearm_link",
+        "wrist_1_link",
+        "wrist_2_link",
+        "wrist_3_link",
+        "tool0",
+        "ee_link",
+    ]
+    chain = [n for n in candidates if n in names]
+
+    # Force tcp_link to be last (and present)
+    if tcp_link in names:
+        if tcp_link in chain:
+            chain = [x for x in chain if x != tcp_link] + [tcp_link]
+        else:
+            chain = chain + [tcp_link]
+    return chain
+
+
+def _multiplier_from_polyline_projection(
+    voxels_xyz: np.ndarray,
+    points_xyz: np.ndarray,
+    m_min: float,
+    m_max: float,
+) -> np.ndarray:
+    """
+    points_xyz: (K,3) polyline points ordered from base->tcp.
+    For each voxel, project to closest segment; convert arc-length position to multiplier.
+    """
+    points_xyz = np.asarray(points_xyz, dtype=float)
+    if points_xyz.shape[0] < 2:
+        return np.ones(len(voxels_xyz), dtype=float) * float(m_max)
+
+    segs = points_xyz[1:] - points_xyz[:-1]            # (K-1,3)
+    seglen = np.linalg.norm(segs, axis=1)              # (K-1,)
+    total = float(np.sum(seglen))
+    if total <= 1e-12:
+        return np.ones(len(voxels_xyz), dtype=float) * float(m_max)
+
+    cum = np.concatenate([[0.0], np.cumsum(seglen)])   # (K,)
+
+    # For each segment, compute closest point param t for all voxels (vectorized over voxels, loop over segments)
+    best_dist2 = np.full(len(voxels_xyz), np.inf, dtype=float)
+    best_s = np.zeros(len(voxels_xyz), dtype=float)
+
+    for i in range(len(segs)):
+        d = segs[i]
+        L2 = float(np.dot(d, d))
+        if L2 <= 1e-18:
+            continue
+
+        p0 = points_xyz[i]
+        v = voxels_xyz - p0                 # (N,3)
+        t = (v @ d) / L2                    # (N,)
+        t = np.clip(t, 0.0, 1.0)
+        closest = p0 + t[:, None] * d[None, :]
+        dist2 = np.sum((voxels_xyz - closest) ** 2, axis=1)
+
+        improved = dist2 < best_dist2
+        if np.any(improved):
+            best_dist2[improved] = dist2[improved]
+            # arc-length position along chain (0..1)
+            s = (cum[i] + t * seglen[i]) / total
+            best_s[improved] = s[improved]
+
+    m_min = float(m_min)
+    m_max = float(m_max)
+    s = np.clip(best_s, 0.0, 1.0)
+    mult = m_min + (m_max - m_min) * s
+    return np.clip(mult, min(m_min, m_max), max(m_min, m_max))
+
+
+def _multiplier_dual_spheres(
+    voxels_xyz: np.ndarray,
+    base_xyz: np.ndarray,
+    elbow_xyz: np.ndarray,
+    tcp_xyz: np.ndarray,
+    m_min: float,
+    m_max: float,
+) -> np.ndarray:
+    """
+    Two spheres centered at elbow and tcp:
+      mult(center)=m_max
+      mult(at radius = ||center-base||) = m_min
+      linear falloff.
+    Combine by max() so proximity to either center boosts multiplier.
+    """
+    base_xyz = np.asarray(base_xyz, dtype=float).reshape(3)
+    elbow_xyz = np.asarray(elbow_xyz, dtype=float).reshape(3)
+    tcp_xyz = np.asarray(tcp_xyz, dtype=float).reshape(3)
+
+    def sphere_mult(center):
+        R = float(np.linalg.norm(center - base_xyz))
+        R = max(R, 1e-6)
+        dist = np.linalg.norm(voxels_xyz - center[None, :], axis=1)
+        # 1 at dist=0, -> m_min at dist=R, clamp beyond
+        t = np.clip(dist / R, 0.0, 1.0)
+        return m_max - (m_max - m_min) * t
+
+    m1 = sphere_mult(elbow_xyz)
+    m2 = sphere_mult(tcp_xyz)
+    mult = np.maximum(m1, m2)
+    return np.clip(mult, min(m_min, m_max), max(m_min, m_max))
+
 
 # ---------------- main ----------------
 
@@ -236,7 +396,7 @@ def main():
                     help="poses.yaml mapping pose_name -> joint angles")
     ap.add_argument("--base-frame", default="world",
                     help="Frame in which voxels are expressed and to which robot is transformed")
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_giant_zeros",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_tcp",
                     help="Output directory (one YAML per pose)")
 
     # shaping
@@ -252,8 +412,30 @@ def main():
                     help="Alpha slope (mode=exp)")
     ap.add_argument("--min-w", type=float, default=0.01,
                     help="Lower clamp for weights (except zero-mask)")
-    ap.add_argument("--zero-inside", type=float, default=0.15,
+    ap.add_argument("--zero-inside", type=float, default=0.1,
                     help="Meters: if voxel is within this distance to robot surface, set weight=0")
+    
+        # --- weighting multiplier (along robot / fallback circles) ---
+    ap.add_argument("--extra-mult-mode", choices=["off", "chain", "dual"], default="chain",
+                    help="Extra multiplier on top of distance weights: "
+                         "'chain' = along robot polyline base->tcp, "
+                         "'dual' = spheres around elbow+tcp, "
+                         "'off' = disabled.")
+    ap.add_argument("--extra-mult-min", type=float, default=0.2,
+                    help="Minimum multiplier at the base-most region (default 0.2).")
+    ap.add_argument("--extra-mult-max", type=float, default=1.0,
+                    help="Maximum multiplier near TCP / joint centers (default 1.0).")
+
+    ap.add_argument("--chain-links", type=str, default="",
+                    help="Comma-separated link names to define the robot polyline (base->...->tcp). "
+                         "If empty, tries a UR-style default chain.")
+    ap.add_argument("--elbow-link", type=str, default="",
+                    help="Link whose origin is at the elbow joint (used for --extra-mult-mode=dual). "
+                         "If empty, tries common UR names.")
+    ap.add_argument("--tcp-link", type=str, default="",
+                    help="Link whose origin is at the TCP/end-effector (used for chain end and dual mode). "
+                         "If empty, tries common UR names (tool0/ee_link/etc.).")
+
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -296,6 +478,83 @@ def main():
             zero_inside=args.zero_inside,
         )
 
+        # --- multiplier (0.2 -> 1.0) based on base->tcp position ---
+
+        extra_mult = None
+        extra_mult_info = {}
+
+        if args.extra_mult_mode != "off":
+            m_min = float(args.extra_mult_min)
+            m_max = float(args.extra_mult_max)
+
+            # Determine TCP link
+            tcp_link = args.tcp_link.strip()
+            if not tcp_link:
+                tcp_link = _pick_first_existing_link(urdf, ["tool0", "ee_link", "tool_link", "wrist_3_link"]) \
+                           or urdf.links[-1].name  # last-resort fallback
+
+            base_link_name = urdf.base_link.name
+            base_xyz = _link_position_in_base_frame(urdf, joint_cfg, base_link_name, base_frame=args.base_frame)
+            tcp_xyz = _link_position_in_base_frame(urdf, joint_cfg, tcp_link, base_frame=args.base_frame)
+
+            if args.extra_mult_mode == "chain":
+                # Chain definition
+                if args.chain_links.strip():
+                    chain_links = [s.strip() for s in args.chain_links.split(",") if s.strip()]
+                else:
+                    chain_links = _default_ur_chain_links(urdf, tcp_link=tcp_link)
+
+                # Convert chain link origins to points
+                points = []
+                for ln in chain_links:
+                    try:
+                        points.append(_link_position_in_base_frame(urdf, joint_cfg, ln, base_frame=args.base_frame))
+                    except Exception:
+                        # skip missing/problem links silently
+                        pass
+                points = np.asarray(points, dtype=float)
+
+                if len(points) < 2:
+                    extra_mult = np.ones(len(voxels), dtype=float) * m_max
+                else:
+                    extra_mult = _multiplier_from_polyline_projection(voxels, points, m_min=m_min, m_max=m_max)
+
+                extra_mult_info = {
+                    "mode": "chain",
+                    "m_min": m_min,
+                    "m_max": m_max,
+                    "tcp_link": tcp_link,
+                    "chain_links_used": chain_links,
+                    "chain_points_count": int(len(points)),
+                }
+
+            elif args.extra_mult_mode == "dual":
+                elbow_link = args.elbow_link.strip()
+                if not elbow_link:
+                    elbow_link = _pick_first_existing_link(urdf, ["forearm_link", "elbow_link", "upper_arm_link"]) \
+                                 or base_link_name
+
+                elbow_xyz = _link_position_in_base_frame(urdf, joint_cfg, elbow_link, base_frame=args.base_frame)
+                extra_mult = _multiplier_dual_spheres(
+                    voxels_xyz=voxels,
+                    base_xyz=base_xyz,
+                    elbow_xyz=elbow_xyz,
+                    tcp_xyz=tcp_xyz,
+                    m_min=m_min,
+                    m_max=m_max,
+                )
+                extra_mult_info = {
+                    "mode": "dual",
+                    "m_min": m_min,
+                    "m_max": m_max,
+                    "elbow_link": elbow_link,
+                    "tcp_link": tcp_link,
+                }
+
+            # Apply multiplier (keeps zeroed voxels at 0)
+            w = np.clip(w * extra_mult, 0.0, 1.0)
+
+
         out_doc = dict(vox_doc)
         out_doc["weighting"] = {
             "type": "robot_collision_distance",
@@ -311,6 +570,8 @@ def main():
             "note": "Weight based on distance to robot collision mesh; voxels within --zero-inside of surface get weight=0.",
         }
         out_doc["weights"] = w.astype(float).tolist()
+        if args.extra_mult_mode != "off":
+            out_doc["weighting"]["extra_multiplier"] = extra_mult_info
 
         out_path = out_dir / f"{pose_name}.yaml"
         out_path.write_text(yaml.safe_dump(out_doc, sort_keys=False))
