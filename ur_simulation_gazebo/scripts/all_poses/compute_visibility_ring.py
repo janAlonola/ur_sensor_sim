@@ -267,9 +267,10 @@ GLOBAL_VOXEL_SIZE = None
 GLOBAL_VOXEL_WEIGHTS = None
 GLOBAL_VOXEL_STEM = None
 GLOBAL_APPEND_DIR = None
+GLOBAL_ALLOW_INPLACE_APPEND = True
 
 def init_worker(urdf_path: str,
-                sensors_src: list,
+                sensors_src: list[tuple[int, dict]],
                 pose_to_cfg: dict,
                 base_frame: str,
                 fov: float,
@@ -279,22 +280,24 @@ def init_worker(urdf_path: str,
                 voxel_size,
                 voxel_weights,
                 voxel_stem: str,
-                append_dir):
+                append_dir,
+                allow_inplace_append: bool):
     """
     Initializer for each worker process: loads URDF once, stores shared data.
     """
     global GLOBAL_URDF, GLOBAL_SENSORS_SRC, GLOBAL_POSE_TO_CFG
     global GLOBAL_BASE_FRAME, GLOBAL_FOV, GLOBAL_MAX_RANGE, GLOBAL_OUT_DIR
     global GLOBAL_VOXELS, GLOBAL_VOXEL_SIZE, GLOBAL_VOXEL_WEIGHTS, GLOBAL_VOXEL_STEM
-    global GLOBAL_APPEND_DIR
-    GLOBAL_APPEND_DIR = Path(append_dir) if append_dir else None    
+    global GLOBAL_APPEND_DIR, GLOBAL_ALLOW_INPLACE_APPEND
+    GLOBAL_APPEND_DIR = Path(append_dir) if append_dir else None  
+    GLOBAL_ALLOW_INPLACE_APPEND = bool(allow_inplace_append)  
     GLOBAL_URDF = URDF.load(urdf_path)
     GLOBAL_SENSORS_SRC = sensors_src
     GLOBAL_POSE_TO_CFG = pose_to_cfg
     GLOBAL_BASE_FRAME = base_frame
     GLOBAL_FOV = fov
     GLOBAL_MAX_RANGE = max_range
-    GLOBAL_OUT_DIR = Path(out_dir)
+    GLOBAL_OUT_DIR = Path(out_dir)    
 
     GLOBAL_VOXELS = voxels
     GLOBAL_VOXEL_SIZE = voxel_size
@@ -311,7 +314,7 @@ def process_pose(pose_name: str):
 
     # Refuse in-place append (easy to accidentally double-append forever)
     if GLOBAL_APPEND_DIR is not None:
-        if GLOBAL_APPEND_DIR.resolve() == GLOBAL_OUT_DIR.resolve():
+        if (GLOBAL_APPEND_DIR.resolve() == GLOBAL_OUT_DIR.resolve()) and (not GLOBAL_ALLOW_INPLACE_APPEND):
             raise ValueError("Refusing to append in-place: append-dir == out-dir")
 
     # Robot mesh for this pose
@@ -323,13 +326,15 @@ def process_pose(pose_name: str):
 
     # Transform ONLY the sensors in GLOBAL_SENSORS_SRC (your selected indices)
     sensors_world = []
-    for s in GLOBAL_SENSORS_SRC:
+    abs_ids = []
+    for abs_idx, s in GLOBAL_SENSORS_SRC:
         xyz_w, rpy_w = sensor_pose_to_base(
             s,
             GLOBAL_URDF,
             joint_cfg,
             base_frame=GLOBAL_BASE_FRAME
         )
+        abs_ids.append(abs_idx)
         sensors_world.append({
             "xyz": xyz_w,
             "rpy": rpy_w,
@@ -345,7 +350,18 @@ def process_pose(pose_name: str):
         fov_deg=GLOBAL_FOV,
         pose_name=pose_name
     )
+    print(f"[DEBUG] pose={pose_name} visible_true={int(visible.sum())} "
+      f"(vox={visible.shape[0]} sens={visible.shape[1]})")
+    
+    per_sensor = visible.sum(axis=0)
+    print(f"[DEBUG] pose={pose_name} per_sensor min/max = {int(per_sensor.min())}/{int(per_sensor.max())}")
+    print(f"[DEBUG] first 10 per_sensor = {per_sensor[:10].tolist()}")
 
+    print("[DEBUG] vox bbox", GLOBAL_VOXELS.min(axis=0), GLOBAL_VOXELS.max(axis=0))
+    print("[DEBUG] sens bbox", np.min([s["xyz"] for s in sensors_world], axis=0),
+                        np.max([s["xyz"] for s in sensors_world], axis=0))
+    
+    
     out_path = GLOBAL_OUT_DIR / f"{GLOBAL_VOXEL_STEM}_{pose_name}_heatmap.yaml"
 
     # ---------------- APPEND MODE ----------------
@@ -360,28 +376,37 @@ def process_pose(pose_name: str):
             raise ValueError("Voxel count mismatch vs old heatmap")
 
         old_sensor_count = int(old_doc["sensor_count"])
+        print("old sensor count", old_sensor_count)
         visible_by = old_doc["visible_by"]  # list[list[int]]
         print("matrixes extracted")
         # Append new visibilities with index offset
-        base = old_sensor_count
         for i in range(len(GLOBAL_VOXELS)):
-            new_hits = np.nonzero(visible[i])[0]
+            new_hits = np.nonzero(visible[i])[0]  # indices into sensors_world / abs_ids
             if new_hits.size:
                 lst = visible_by[i]
                 for j in new_hits:
-                    idx = base + int(j)
-                    # avoid duplicates if you re-run by accident
+                    idx = int(abs_ids[int(j)])    # <-- absolute candidate index
                     if idx not in lst:
                         lst.append(idx)
 
         coverage = [len(lst) for lst in visible_by]
         print("coverage")
         out_doc = dict(old_doc)
-        out_doc["sensor_count"] = old_sensor_count + len(sensors_world)
-        out_doc["coverage"] = coverage
+        out_doc["sensor_count"] = old_sensor_count  # keep same!
         out_doc["visible_by"] = visible_by
+        out_doc["coverage"] = [len(lst) for lst in visible_by]
         out_doc["fov_deg"] = float(GLOBAL_FOV)
         out_doc["max_range_m"] = float(GLOBAL_MAX_RANGE)
+
+        # quick sanity: count appearances of a few patched ids
+        test_ids = abs_ids[:3]  # first 3 patched sensors
+        counts = {tid: 0 for tid in test_ids}
+        for lst in out_doc["visible_by"]:
+            for tid in test_ids:
+                if tid in lst:
+                    counts[tid] += 1
+        print("[DEBUG] appearance counts", counts)
+
 
     # ---------------- FRESH MODE ----------------
     else:
@@ -424,7 +449,7 @@ def main():
                     help="Single voxel YAML")
     ap.add_argument("--poses", default="ur_sensor_sim/tmp/poses.yaml",
                     help="poses.yaml with joint_names and poses")
-    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_vars",
+    ap.add_argument("--out", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Output directory (one heatmap per pose)")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
@@ -432,8 +457,19 @@ def main():
     ap.add_argument("--base-frame", default="world", help="Frame to express sensors/voxels in")
     ap.add_argument("--workers", type=int, default=5,
                     help="Number of parallel worker processes (default: num CPU cores)")
-    ap.add_argument("--append-dir", default="ur_sensor_sim/tmp/big_visibility",
+    ap.add_argument("--append-dir", default="ur_sensor_sim/tmp/big_visibility_vars",
                 help="If set, load existing heatmaps from this directory and append new sensors to them.")
+    
+    ap.add_argument("--no-patch-upperarm-rings",
+                dest="patch_upperarm_rings",
+                action="store_false",
+                help="Disable upperarm ring patching.")
+    ap.set_defaults(patch_upperarm_rings=True)
+    ap.add_argument("--ring-map", default="ring_variants_index_map.json",
+                    help="Path to ring_variants_index_map.json (LOCAL indices).")
+    ap.add_argument("--ring-base-index", type=int, default=2658,
+                    help="Absolute start index of appended ring variants (local 0 maps to this).")
+
 
     args = ap.parse_args()
 
@@ -454,9 +490,46 @@ def main():
     # Load inputs (once, then shared to workers)
     cand_doc = load_yaml(cand_path)
     sensors = cand_doc["candidates"]
-    indices = range(2658, len(sensors))
-    sensors_src = [sensors[i] for i in indices]
-    print(f"[INFO] Loaded {len(sensors_src)} candidate sensors from {cand_path.name}")
+
+    allow_inplace = False
+    append_dir = args.append_dir
+
+    if args.patch_upperarm_rings:
+        append_dir = str(out_dir)          # read from the same folder you write to
+        allow_inplace = True              # allow in-place, only in patch mode
+
+        if not append_dir:
+            raise SystemExit("--patch-upperarm-rings requires --append-dir (existing heatmaps).")
+
+        ring_map = load_yaml(Path(args.ring_map)) if args.ring_map.endswith((".yaml", ".yml")) else yaml.safe_load(Path(args.ring_map).read_text())
+        # ring_map is JSON in your setup, but yaml.safe_load can parse JSON too.
+
+        upper_names = sorted([k for k in ring_map.keys() if k.startswith("upperarm_ring_")])
+        if not upper_names:
+            raise SystemExit("No keys starting with 'upperarm_ring_' found in ring map.")
+
+        abs_indices = []
+        for k in upper_names:
+            local = ring_map[k].get("indices", [])
+            abs_indices.extend([args.ring_base_index + int(i) for i in local])
+        print(abs_indices)
+        abs_indices = sorted(set(abs_indices))
+        # Sanity:
+        if min(abs_indices) < 0 or max(abs_indices) >= len(sensors):
+            raise SystemExit(f"Upperarm ring abs indices out of range [0,{len(sensors)-1}]. "
+                            f"min={min(abs_indices)} max={max(abs_indices)}")
+
+        # We will compute only these sensors, but we must remember their ABS indices.
+        sensors_src = [(i, sensors[i]) for i in abs_indices]   # (abs_idx, sensor_dict)
+        print(f"[INFO] PATCH mode: computing {len(sensors_src)} upperarm ring sensors "
+            f"covering abs index range [{min(abs_indices)}, {max(abs_indices)}]")
+
+    else:
+        # old behavior
+        indices = range(2658, len(sensors))
+        sensors_src = [(i, sensors[i]) for i in indices]
+        print(f"[INFO] Loaded {len(sensors_src)} candidate sensors from {cand_path.name} (abs idx {indices.start}..{len(sensors)-1})")
+
 
     vdoc = load_yaml(vox_path)
     voxels = np.asarray(vdoc["voxels"], dtype=np.float32)
@@ -490,7 +563,8 @@ def main():
                   voxel_size,
                   voxel_weights,
                   voxel_stem,
-                  args.append_dir
+                  append_dir,
+                  allow_inplace
                   )
     ) as exe:
         futures = {exe.submit(process_pose, name): name for name in pose_names}

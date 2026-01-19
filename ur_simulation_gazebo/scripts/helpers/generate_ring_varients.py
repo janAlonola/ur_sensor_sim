@@ -496,7 +496,7 @@ def build_config():
             link="upper_arm_link",
             kind="YZ_X",
             center=[-0.11, 0.0, 0.176],
-            radius=0.05,
+            radius=0.055,
             N=8,
             offset=OFFSET,
             tilts=TiltConfig(tilts_deg=TILTS, include_all=True, include_alt=False),
