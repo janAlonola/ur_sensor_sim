@@ -511,7 +511,7 @@ def combine_fixed(*lists: List[int]) -> List[int]:
 
 def parse_args():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars",
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + ring already stacked).")
     ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")

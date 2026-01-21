@@ -500,7 +500,7 @@ def multipose_grasp(
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Optimize one sensor set over MANY poses (multi-pose objective).")
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility", help="Heatmap YAML (with visible_by) OR directory of such YAMLs")
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched", help="Heatmap YAML (with visible_by) OR directory of such YAMLs")
     ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"], help="One or more .npy paths or globs (one per pose).")
     # Die beiden Optionen hier sind für die Aggregation der Gewichte pro Pose zu einem einzigen Vektor pro Voxel (zurzeit unbenutzt)
     ap.add_argument("--weights-agg", choices=["max","mean","softmax"], default="max", help="Aggregate pose-specific weights into one per-voxel vector.")
@@ -522,7 +522,7 @@ def parse_args():
     ap.add_argument("--rcl-size", type=int, default=5, help="Restricted candidate list size.")
     ap.add_argument("--seed", type=int, default=0, help="Random seed.")
     ap.add_argument("--verbose", action="store_true", help="Verbose per-iter logs.")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/test_new_weights_25.json",
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/final_experiment_25.json",
                     help="Save results JSON here.")
     ap.add_argument("--procs", type=int, default=None, help="Processes for parallel seeds (default: CPU count)")
 
