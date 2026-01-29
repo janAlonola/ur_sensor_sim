@@ -574,9 +574,9 @@ def _infer_appended_offset(S_total: int, ring_map: dict) -> int:
 def parse_args():
     ap = argparse.ArgumentParser(description="Exhaustive evaluation of 3-ring combinations (rings only).")
 
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars",
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + appended ring variants).")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"],
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp_10/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
     ap.add_argument("--normalize-weights", action="store_true")
 
@@ -591,7 +591,7 @@ def parse_args():
     ap.add_argument("--ring-base-index", type=int, default=2658,
                     help="Absolute start index of appended ring variants (local 0 maps to this).")
 
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/test",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/new_new_weights_3_ring",
                     help="Output folder for results.")
 
     ap.add_argument("--top-n", type=int, default=100,

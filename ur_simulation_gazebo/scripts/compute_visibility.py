@@ -137,7 +137,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--candidates", default="ur_sensor_sim/mesh_sampling/big_candidates_vars.yaml", help="Path to candidates.yaml")
     ap.add_argument("--voxels", default="ur_sensor_sim/tmp/capsule.yaml", help="Path to workspace_voxels.yaml")
-    ap.add_argument("--out", default="upperarm_visibility.yaml", help="Output YAML file")
+    ap.add_argument("--out", default="middle_tcp.yaml", help="Output YAML file")
     ap.add_argument("--fov", type=float, default=60.0, help="Field of view (deg)")
     ap.add_argument("--max-range", type=float, default=1.5, help="Sensor max range (m)")
     args = ap.parse_args()
@@ -147,15 +147,7 @@ def main():
     vox  = load_yaml(args.voxels)
     sensors = cand["candidates"]
     #random
-    indices = [
-    3050,
-    3051,
-    3052,
-    3053,
-    3054,
-    3055,
-    3056,
-    3057]
+    indices = [2658, 2659, 2660, 2661, 2662, 2663, 2664, 2665]
     #indices = [11, 114, 317, 626, 1062, 286, 104, 824, 296, 241, 649, 1128, 860, 367, 377, 1124, 826, 858, 560, 898]#[0, 15, 76, 285, 296, 311, 367, 368, 389, 392, 626, 824, 851, 858, 859, 861, 933, 942, 995, 1118] #[452, 28, 117, 0, 566, 338, 104, 581, 371, 1128, 942, 856, 855, 382, 824, 843, 367, 285, 314, 860]
     # Extract those sensors
     sensors = [sensors[i] for i in indices]
@@ -176,15 +168,15 @@ def main():
     ]
 
     base_sets = [
-        (0, -90, 0),
+    #    (0, -90, 0),
     #    (0, 0, 0),
     #    (0, -90, 90),
-    #    (0, -125, 90),
+        (0, -125, 90),
     #    (0, -90, 160),
     ]
     wrist_sets = [
-        (-90, 0, 0),
-    #    (0, 90, 0),
+     #   (-90, 0, 0),
+        (0, 90, 0),
     #   (-90, 90, 0),
     ]
 

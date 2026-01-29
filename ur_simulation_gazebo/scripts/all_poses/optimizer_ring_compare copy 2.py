@@ -534,7 +534,7 @@ def parse_args():
 
     ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + appended ring variants).")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_bigger_zeros/*.npy"],
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
     ap.add_argument("--normalize-weights", action="store_true")
 
@@ -549,10 +549,10 @@ def parse_args():
     ap.add_argument("--ring-base-index", type=int, default=2658,
                     help="Absolute start index of appended ring variants (local 0 maps to this).")
 
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiments_3rings_old_w",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiments_3rings_new_w",
                     help="Output folder for results.")
 
-    ap.add_argument("--top-n", type=int, default=100,
+    ap.add_argument("--top-n", type=int, default=1000,
                     help="How many top combinations to store in CSV/JSON.")
 
     return ap.parse_args()

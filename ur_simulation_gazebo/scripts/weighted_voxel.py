@@ -65,6 +65,38 @@ def _falloff(norm: np.ndarray, mode: str, gamma: float, alpha: float) -> np.ndar
         raise ValueError(f"Unknown mode '{mode}'")
     return np.clip(val, 0.0, 1.0)
 
+def _point_in_link_frame_to_base_frame(
+    urdf: URDF,
+    joint_cfg: dict,
+    link_name: str,
+    base_frame: str | None,
+    p_link: np.ndarray,
+) -> np.ndarray:
+    link_by_name = {L.name: L for L in urdf.links}
+    if link_name not in link_by_name:
+        raise ValueError(f"Link '{link_name}' not found in URDF.")
+
+    link_fk = urdf.link_fk(cfg=joint_cfg)
+    T_base_link = link_fk[link_by_name[link_name]]  # behaves as (link -> base_link)
+
+    # If user wants coordinates in another base_frame, rebase base_link -> base_frame
+    if base_frame is None or base_frame == urdf.base_link.name:
+        T_out_base = np.eye(4)
+    else:
+        # _compute_T_req_base returns (base_frame -> base_link)
+        T_req_base = _compute_T_req_base(urdf, joint_cfg, base_frame)
+        T_out_base = np.linalg.inv(T_req_base)  # (base_link -> base_frame)
+
+    p = np.asarray(p_link, dtype=float).reshape(3)
+    ph = np.array([p[0], p[1], p[2], 1.0], dtype=float)
+
+    # link -> base_link
+    p_base = T_base_link @ ph
+    # base_link -> base_frame
+    p_out = T_out_base @ p_base
+    return p_out[:3].astype(float)
+
+
 # --------------- URDF + pose helpers ---------------
 
 def load_pose_table(poses_yaml: Path, urdf_joint_suffix="_joint"):
@@ -396,7 +428,7 @@ def main():
                     help="poses.yaml mapping pose_name -> joint angles")
     ap.add_argument("--base-frame", default="world",
                     help="Frame in which voxels are expressed and to which robot is transformed")
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_tcp",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/weighted_poses_tcp_10",
                     help="Output directory (one YAML per pose)")
 
     # shaping
@@ -435,6 +467,8 @@ def main():
     ap.add_argument("--tcp-link", type=str, default="",
                     help="Link whose origin is at the TCP/end-effector (used for chain end and dual mode). "
                          "If empty, tries common UR names (tool0/ee_link/etc.).")
+    ap.add_argument("--tcp-offset-tool0", type=float, default=0.0,
+                help="Meters: virtual TCP point at (0,0,tcp_offset_tool0) in tool0 frame (default 0.10 = 10cm).")
 
     args = ap.parse_args()
 
@@ -495,7 +529,17 @@ def main():
 
             base_link_name = urdf.base_link.name
             base_xyz = _link_position_in_base_frame(urdf, joint_cfg, base_link_name, base_frame=args.base_frame)
-            tcp_xyz = _link_position_in_base_frame(urdf, joint_cfg, tcp_link, base_frame=args.base_frame)
+
+            # virtual TCP = (0,0,offset) in tool0 frame
+            tcp_xyz = _point_in_link_frame_to_base_frame(
+                urdf=urdf,
+                joint_cfg=joint_cfg,
+                link_name=tcp_link,                # typically "tool0"
+                base_frame=args.base_frame,
+                p_link=np.array([0.0, 0.0, float(args.tcp_offset_tool0)])
+            )
+            # tcp_xyz = _link_position_in_base_frame(urdf, joint_cfg, tcp_link, base_frame=args.base_frame)
+
 
             if args.extra_mult_mode == "chain":
                 # Chain definition
@@ -513,6 +557,12 @@ def main():
                         # skip missing/problem links silently
                         pass
                 points = np.asarray(points, dtype=float)
+
+                if points.size == 0:
+                    points = tcp_xyz.reshape(1, 3)
+                else:
+                    # If the last point is already tool0 origin, keep it and append the virtual TCP
+                    points = np.vstack([points, tcp_xyz.reshape(1, 3)])
 
                 if len(points) < 2:
                     extra_mult = np.ones(len(voxels), dtype=float) * m_max
