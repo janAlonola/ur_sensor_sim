@@ -530,7 +530,7 @@ def _infer_appended_offset(S_total: int, ring_map: dict) -> int:
     return S_total - appended_count
 
 def parse_args():
-    ap = argparse.ArgumentParser(description="Exhaustive evaluation of 3-ring combinations (rings only).")
+    ap = argparse.ArgumentParser(description="Evaluate SINGLE-ring performance (one ring at a time).")
 
     ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + appended ring variants).")
@@ -542,21 +542,20 @@ def parse_args():
     ap.add_argument("--softmin-temp", type=float, default=0.3)
     ap.add_argument("--frac-alpha", type=float, default=0.6)
 
-    ap.add_argument("--k", type=int, default=24, help="Total sensor budget (must equal total sensors in the chosen 3 rings).")
+    # OPTIONAL: if set, only evaluate rings whose size == k
+    ap.add_argument("--k", type=int, default=None,
+                    help="Optional: only evaluate rings with this sensor count. If omitted, evaluate all rings.")
 
     ap.add_argument("--ring-map", default="ring_variants_index_map.json",
                     help="Path to ring_variants_index_map.json (stores LOCAL indices).")
     ap.add_argument("--ring-base-index", type=int, default=2658,
                     help="Absolute start index of appended ring variants (local 0 maps to this).")
 
-    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiment_flange_fixed",
+    ap.add_argument("--out-dir", default="ur_sensor_sim/tmp/ring_experiment_single_ring",
                     help="Output folder for results.")
 
     ap.add_argument("--top-n", type=int, default=1000,
-                    help="How many top combinations to store in CSV/JSON.")
-    ap.add_argument("--fixed-ring", default="flange_ring_tilt_all_-90",
-                help="Ring key that is always included (must exist in ring map).")
-
+                    help="How many top results to store in CSV/JSON.")
 
     return ap.parse_args()
 
@@ -589,7 +588,6 @@ def main():
     for name in ring_names:
         local = ring_map[name].get("indices", [])
         abs_inds = [base_offset + int(i) for i in local]
-        # Basic safety checks
         if any((sidx < 0 or sidx >= S) for sidx in abs_inds):
             raise SystemExit(f"[ERROR] Ring '{name}' has abs indices outside [0,{S-1}]")
         rings_abs[name] = abs_inds
@@ -600,7 +598,6 @@ def main():
     assert S2 == S and V2 == V and P2 == P
 
     # 5) Precompute per-ring coverage masks (P,V) bool
-    #    This makes the triple-combo loop fast.
     print("[INFO] Precomputing per-ring coverage masks ...")
     ring_cov = {}  # name -> (P,V) bool
     for name in ring_names:
@@ -612,25 +609,16 @@ def main():
                     cov[p, idx] = True
         ring_cov[name] = cov
 
-        # 6) Exhaustive search: fixed ring + all pairs of remaining rings
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    fixed_name = args.fixed_ring
-    if fixed_name not in ring_cov:
-        raise SystemExit(f"[ERROR] --fixed-ring '{fixed_name}' not found in ring map keys.")
+    # 6) Evaluate each ring alone
+    want_k = args.k
+    print(f"[INFO] Evaluating SINGLE rings (count={len(ring_names)})"
+          + (f" with size == k={want_k}" if want_k is not None else ""))
 
-    fixed_cov = ring_cov[fixed_name]
-    fixed_size = ring_sizes[fixed_name]
-    fixed_abs  = rings_abs[fixed_name]
-
-    # only consider other rings
-    others = [nm for nm in ring_names if nm != fixed_name]
-    n = len(others)
-
-    best = None  # (obj, (fixed,b,c), fixed_count)
+    best = None   # (obj, ring_name, ring_size)
     topN = []
-
     checked = 0
     skipped_k = 0
 
@@ -640,88 +628,73 @@ def main():
         if len(topN) > int(args.top_n):
             topN.pop()
 
-    total_pairs = n * (n - 1) // 2
-    print(f"[INFO] Evaluating all (fixed + 2)-ring combos: fixed='{fixed_name}' "
-          f"+ pairs from {n} other rings (~{total_pairs} pairs), keeping k={args.k} ...")
-
     t0 = time.time()
-    for i in range(n):
-        b = others[i]
-        for j in range(i + 1, n):
-            c = others[j]
+    for i, name in enumerate(ring_names, start=1):
+        rsize = ring_sizes[name]
+        if want_k is not None and rsize != want_k:
+            skipped_k += 1
+            continue
 
-            fixed_count = fixed_size + ring_sizes[b] + ring_sizes[c]
-            if fixed_count != args.k:
-                skipped_k += 1
-                continue
+        covered = ring_cov[name]  # (P,V)
+        obj = objective_from_masks(
+            covered, W,
+            mode=args.objective,
+            softmin_temp=args.softmin_temp,
+            frac_alpha=args.frac_alpha
+        )
 
-            covered = fixed_cov | ring_cov[b] | ring_cov[c]
-            obj = objective_from_masks(
-                covered, W,
-                mode=args.objective,
-                softmin_temp=args.softmin_temp,
-                frac_alpha=args.frac_alpha
-            )
-
-            checked += 1
-            if (best is None) or (obj > best[0]):
-                best = (obj, (fixed_name, b, c), fixed_count)
-                elapsed = time.time() - t0
-                print(f"\n[BEST] obj={obj:.3f} | rings={fixed_name}, {b}, {c} | fixed={fixed_count} "
-                      f"| checked={checked} | elapsed={elapsed:.1f}s")
-
-            _push_top({
-                "objective_value": float(obj),
-                "rings": [fixed_name, b, c],
-                "fixed_count": int(fixed_count),
-                "fixed_indices": sorted(set(fixed_abs + rings_abs[b] + rings_abs[c])),
-            })
-
-        if (i % 10) == 0 and i > 0:
+        checked += 1
+        if best is None or obj > best[0]:
+            best = (obj, name, rsize)
             elapsed = time.time() - t0
-            print(f"[PROGRESS] i={i}/{n} | checked={checked} | skipped_k={skipped_k} | elapsed={elapsed:.1f}s")
+            print(f"[BEST] obj={obj:.3f} | ring={name} | size={rsize} | checked={checked} | elapsed={elapsed:.1f}s")
 
+        _push_top({
+            "objective_value": float(obj),
+            "ring": name,
+            "ring_size": int(rsize),
+            "indices": rings_abs[name],
+        })
+
+        if (i % 10) == 0:
+            elapsed = time.time() - t0
+            print(f"[PROGRESS] {i}/{len(ring_names)} | checked={checked} | skipped_k={skipped_k} | elapsed={elapsed:.1f}s")
 
     if best is None:
-        raise SystemExit(f"[ERROR] No triple matched k={args.k}. "
-                         f"Check ring sizes; maybe many rings are not size 8?")
+        raise SystemExit("[ERROR] No rings evaluated (maybe your --k filtered everything?).")
 
-    best_obj, (ra, rb, rc), fixed_count = best
-    best_fixed = sorted(set(rings_abs[ra] + rings_abs[rb] + rings_abs[rc]))
+    best_obj, best_ring, best_size = best
 
     # 7) Write outputs
     best_json = {
         "status": "ok",
         "objective_mode": args.objective,
         "objective_value": float(best_obj),
-        "rings": [ra, rb, rc],
-        "k": int(args.k),
-        "fixed_count": int(fixed_count),
-        "fixed_indices": best_fixed,
+        "ring": best_ring,
+        "ring_size": int(best_size),
+        "indices": rings_abs[best_ring],
         "S": int(S), "V": int(V), "P": int(P),
         "heatmap_sources": heatmap_files,
         "weights_sources": weight_files,
         "normalize_weights": bool(args.normalize_weights),
-        "notes": "Exhaustive search over 3-ring combinations; no GRASP/random sensors.",
+        "k_filter": (None if want_k is None else int(want_k)),
+        "notes": "Single-ring evaluation only (no fixed ring).",
     }
-    (out_dir / "best_3rings.json").write_text(json.dumps(best_json, indent=2))
-    (out_dir / "top_3rings.json").write_text(json.dumps(topN, indent=2))
+    (out_dir / "best_1ring.json").write_text(json.dumps(best_json, indent=2))
+    (out_dir / "top_1ring.json").write_text(json.dumps(topN, indent=2))
 
-    # CSV (easy to paste/open in Excel)
-    with open(out_dir / "top_fixedplus2.csv", "w") as f:
-        f.write("rank,objective_value,fixed_ring,ring_b,ring_c,fixed_count\n")
+    with open(out_dir / "top_1ring.csv", "w") as f:
+        f.write("rank,objective_value,ring,ring_size\n")
         for r, entry in enumerate(topN, start=1):
-            fixed_ring, b, c = entry["rings"]
-            f.write(f"{r},{entry['objective_value']:.10f},{fixed_ring},{b},{c},{entry['fixed_count']}\n")
-
+            f.write(f"{r},{entry['objective_value']:.10f},{entry['ring']},{entry['ring_size']}\n")
 
     elapsed = time.time() - t0
     print("\n========== DONE ==========")
-    print(f"[OK] Best: obj={best_obj:.3f} | rings={ra}, {rb}, {rc} | fixed={fixed_count}")
-    print(f"[OK] Checked={checked} triples (skipped_k={skipped_k}) | elapsed={elapsed:.1f}s")
-    print(f"[OK] Wrote: {out_dir / 'best_3rings.json'}")
-    print(f"[OK] Wrote: {out_dir / 'top_3rings.csv'}")
-    print(f"[OK] Wrote: {out_dir / 'top_3rings.json'}")
+    print(f"[OK] Best: obj={best_obj:.3f} | ring={best_ring} | size={best_size}")
+    print(f"[OK] Evaluated={checked} rings (skipped_k={skipped_k}) | elapsed={elapsed:.1f}s")
+    print(f"[OK] Wrote: {out_dir / 'best_1ring.json'}")
+    print(f"[OK] Wrote: {out_dir / 'top_1ring.json'}")
+    print(f"[OK] Wrote: {out_dir / 'top_1ring.csv'}")
 
 
 if __name__ == "__main__":

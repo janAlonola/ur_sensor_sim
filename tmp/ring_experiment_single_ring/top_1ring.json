@@ -1,0 +1,1142 @@
+[
+  {
+    "objective_value": 69875.41263479627,
+    "ring": "base_cap_tilt_all_-30",
+    "ring_size": 8,
+    "indices": [
+      3242,
+      3243,
+      3244,
+      3245,
+      3246,
+      3247,
+      3248,
+      3249
+    ]
+  },
+  {
+    "objective_value": 67992.59798423148,
+    "ring": "upperarm_ring_tilt_all_60",
+    "ring_size": 8,
+    "indices": [
+      3090,
+      3091,
+      3092,
+      3093,
+      3094,
+      3095,
+      3096,
+      3097
+    ]
+  },
+  {
+    "objective_value": 67773.58048702928,
+    "ring": "base_cap_tilt_all_-45",
+    "ring_size": 8,
+    "indices": [
+      3250,
+      3251,
+      3252,
+      3253,
+      3254,
+      3255,
+      3256,
+      3257
+    ]
+  },
+  {
+    "objective_value": 67332.95740736673,
+    "ring": "upperarm_ring_tilt_all_45",
+    "ring_size": 8,
+    "indices": [
+      3082,
+      3083,
+      3084,
+      3085,
+      3086,
+      3087,
+      3088,
+      3089
+    ]
+  },
+  {
+    "objective_value": 65215.192949304525,
+    "ring": "upperarm_cap_1_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      3170,
+      3171,
+      3172,
+      3173,
+      3174,
+      3175,
+      3176,
+      3177
+    ]
+  },
+  {
+    "objective_value": 64019.97588075011,
+    "ring": "forearm_cap_1_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      2954,
+      2955,
+      2956,
+      2957,
+      2958,
+      2959,
+      2960,
+      2961
+    ]
+  },
+  {
+    "objective_value": 61680.72281383748,
+    "ring": "upperarm_cap_2_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      3002,
+      3003,
+      3004,
+      3005,
+      3006,
+      3007,
+      3008,
+      3009
+    ]
+  },
+  {
+    "objective_value": 61673.204385242454,
+    "ring": "forearm_cap_1_tilt_all_10",
+    "ring_size": 8,
+    "indices": [
+      2962,
+      2963,
+      2964,
+      2965,
+      2966,
+      2967,
+      2968,
+      2969
+    ]
+  },
+  {
+    "objective_value": 59706.679450346244,
+    "ring": "base_cap_tilt_all_-15",
+    "ring_size": 8,
+    "indices": [
+      3234,
+      3235,
+      3236,
+      3237,
+      3238,
+      3239,
+      3240,
+      3241
+    ]
+  },
+  {
+    "objective_value": 58441.920128220336,
+    "ring": "base_cap_tilt_all_-60",
+    "ring_size": 8,
+    "indices": [
+      3258,
+      3259,
+      3260,
+      3261,
+      3262,
+      3263,
+      3264,
+      3265
+    ]
+  },
+  {
+    "objective_value": 57723.84330386617,
+    "ring": "upperarm_cap_1_tilt_all_-10",
+    "ring_size": 8,
+    "indices": [
+      3178,
+      3179,
+      3180,
+      3181,
+      3182,
+      3183,
+      3184,
+      3185
+    ]
+  },
+  {
+    "objective_value": 57695.3662930224,
+    "ring": "forearm_cap_1_tilt_all_15",
+    "ring_size": 8,
+    "indices": [
+      2970,
+      2971,
+      2972,
+      2973,
+      2974,
+      2975,
+      2976,
+      2977
+    ]
+  },
+  {
+    "objective_value": 56992.85943482186,
+    "ring": "base_cap_tilt_all_-10",
+    "ring_size": 8,
+    "indices": [
+      3226,
+      3227,
+      3228,
+      3229,
+      3230,
+      3231,
+      3232,
+      3233
+    ]
+  },
+  {
+    "objective_value": 56563.21577629658,
+    "ring": "forearm_cap_2_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      2818,
+      2819,
+      2820,
+      2821,
+      2822,
+      2823,
+      2824,
+      2825
+    ]
+  },
+  {
+    "objective_value": 54653.9299436715,
+    "ring": "upperarm_cap_2_tilt_all_-10",
+    "ring_size": 8,
+    "indices": [
+      3010,
+      3011,
+      3012,
+      3013,
+      3014,
+      3015,
+      3016,
+      3017
+    ]
+  },
+  {
+    "objective_value": 53963.42346631637,
+    "ring": "forearm_cap_2_tilt_all_10",
+    "ring_size": 8,
+    "indices": [
+      2826,
+      2827,
+      2828,
+      2829,
+      2830,
+      2831,
+      2832,
+      2833
+    ]
+  },
+  {
+    "objective_value": 51949.492554607794,
+    "ring": "upperarm_cap_1_tilt_all_-15",
+    "ring_size": 8,
+    "indices": [
+      3186,
+      3187,
+      3188,
+      3189,
+      3190,
+      3191,
+      3192,
+      3193
+    ]
+  },
+  {
+    "objective_value": 51849.6751421119,
+    "ring": "forearm_cap_2_tilt_all_15",
+    "ring_size": 8,
+    "indices": [
+      2834,
+      2835,
+      2836,
+      2837,
+      2838,
+      2839,
+      2840,
+      2841
+    ]
+  },
+  {
+    "objective_value": 51726.177133258345,
+    "ring": "base_cap_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      3218,
+      3219,
+      3220,
+      3221,
+      3222,
+      3223,
+      3224,
+      3225
+    ]
+  },
+  {
+    "objective_value": 51412.978822052406,
+    "ring": "upperarm_ring_tilt_all_30",
+    "ring_size": 8,
+    "indices": [
+      3074,
+      3075,
+      3076,
+      3077,
+      3078,
+      3079,
+      3080,
+      3081
+    ]
+  },
+  {
+    "objective_value": 50043.33206501329,
+    "ring": "upperarm_cap_2_tilt_all_-15",
+    "ring_size": 8,
+    "indices": [
+      3018,
+      3019,
+      3020,
+      3021,
+      3022,
+      3023,
+      3024,
+      3025
+    ]
+  },
+  {
+    "objective_value": 47664.37062400376,
+    "ring": "flange_ring_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      2658,
+      2659,
+      2660,
+      2661,
+      2662,
+      2663,
+      2664,
+      2665
+    ]
+  },
+  {
+    "objective_value": 45469.96981555085,
+    "ring": "wrist_cap_1_tilt_all_-30",
+    "ring_size": 8,
+    "indices": [
+      2794,
+      2795,
+      2796,
+      2797,
+      2798,
+      2799,
+      2800,
+      2801
+    ]
+  },
+  {
+    "objective_value": 45257.96204282424,
+    "ring": "wrist_cap_2_tilt_all_15",
+    "ring_size": 8,
+    "indices": [
+      2738,
+      2739,
+      2740,
+      2741,
+      2742,
+      2743,
+      2744,
+      2745
+    ]
+  },
+  {
+    "objective_value": 45126.33277334898,
+    "ring": "wrist_cap_2_tilt_all_10",
+    "ring_size": 8,
+    "indices": [
+      2730,
+      2731,
+      2732,
+      2733,
+      2734,
+      2735,
+      2736,
+      2737
+    ]
+  },
+  {
+    "objective_value": 45098.911043229324,
+    "ring": "flange_ring_tilt_all_-10",
+    "ring_size": 8,
+    "indices": [
+      2666,
+      2667,
+      2668,
+      2669,
+      2670,
+      2671,
+      2672,
+      2673
+    ]
+  },
+  {
+    "objective_value": 44651.59909735483,
+    "ring": "wrist_cap_2_tilt_all_30",
+    "ring_size": 8,
+    "indices": [
+      2746,
+      2747,
+      2748,
+      2749,
+      2750,
+      2751,
+      2752,
+      2753
+    ]
+  },
+  {
+    "objective_value": 44322.00240720552,
+    "ring": "wrist_cap_2_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      2722,
+      2723,
+      2724,
+      2725,
+      2726,
+      2727,
+      2728,
+      2729
+    ]
+  },
+  {
+    "objective_value": 43676.84519589876,
+    "ring": "wrist_cap_1_tilt_all_-15",
+    "ring_size": 8,
+    "indices": [
+      2786,
+      2787,
+      2788,
+      2789,
+      2790,
+      2791,
+      2792,
+      2793
+    ]
+  },
+  {
+    "objective_value": 43436.40117468763,
+    "ring": "flange_ring_tilt_all_-15",
+    "ring_size": 8,
+    "indices": [
+      2674,
+      2675,
+      2676,
+      2677,
+      2678,
+      2679,
+      2680,
+      2681
+    ]
+  },
+  {
+    "objective_value": 43371.36616894677,
+    "ring": "wrist_cap_1_tilt_all_-10",
+    "ring_size": 8,
+    "indices": [
+      2778,
+      2779,
+      2780,
+      2781,
+      2782,
+      2783,
+      2784,
+      2785
+    ]
+  },
+  {
+    "objective_value": 42835.43430149894,
+    "ring": "forearm_cap_1_tilt_all_30",
+    "ring_size": 8,
+    "indices": [
+      2978,
+      2979,
+      2980,
+      2981,
+      2982,
+      2983,
+      2984,
+      2985
+    ]
+  },
+  {
+    "objective_value": 42733.97487416261,
+    "ring": "wrist_cap_1_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      2770,
+      2771,
+      2772,
+      2773,
+      2774,
+      2775,
+      2776,
+      2777
+    ]
+  },
+  {
+    "objective_value": 42325.146333792996,
+    "ring": "forearm_cap_2_tilt_all_30",
+    "ring_size": 8,
+    "indices": [
+      2842,
+      2843,
+      2844,
+      2845,
+      2846,
+      2847,
+      2848,
+      2849
+    ]
+  },
+  {
+    "objective_value": 39854.26579954399,
+    "ring": "wrist_cap_1_tilt_all_-45",
+    "ring_size": 8,
+    "indices": [
+      2802,
+      2803,
+      2804,
+      2805,
+      2806,
+      2807,
+      2808,
+      2809
+    ]
+  },
+  {
+    "objective_value": 38496.583249365496,
+    "ring": "upperarm_ring_x_-0.46",
+    "ring_size": 8,
+    "indices": [
+      3154,
+      3155,
+      3156,
+      3157,
+      3158,
+      3159,
+      3160,
+      3161
+    ]
+  },
+  {
+    "objective_value": 37921.943651162495,
+    "ring": "upperarm_ring_x_-0.51",
+    "ring_size": 8,
+    "indices": [
+      3162,
+      3163,
+      3164,
+      3165,
+      3166,
+      3167,
+      3168,
+      3169
+    ]
+  },
+  {
+    "objective_value": 37710.45141665264,
+    "ring": "upperarm_ring_tilt_all_15",
+    "ring_size": 8,
+    "indices": [
+      3066,
+      3067,
+      3068,
+      3069,
+      3070,
+      3071,
+      3072,
+      3073
+    ]
+  },
+  {
+    "objective_value": 37678.44296113798,
+    "ring": "upperarm_ring_x_-0.41",
+    "ring_size": 8,
+    "indices": [
+      3146,
+      3147,
+      3148,
+      3149,
+      3150,
+      3151,
+      3152,
+      3153
+    ]
+  },
+  {
+    "objective_value": 36711.84898054025,
+    "ring": "wrist_cap_2_tilt_all_45",
+    "ring_size": 8,
+    "indices": [
+      2754,
+      2755,
+      2756,
+      2757,
+      2758,
+      2759,
+      2760,
+      2761
+    ]
+  },
+  {
+    "objective_value": 36608.4652626633,
+    "ring": "flange_ring_tilt_all_-30",
+    "ring_size": 8,
+    "indices": [
+      2682,
+      2683,
+      2684,
+      2685,
+      2686,
+      2687,
+      2688,
+      2689
+    ]
+  },
+  {
+    "objective_value": 36556.23831844467,
+    "ring": "upperarm_ring_x_-0.36",
+    "ring_size": 8,
+    "indices": [
+      3138,
+      3139,
+      3140,
+      3141,
+      3142,
+      3143,
+      3144,
+      3145
+    ]
+  },
+  {
+    "objective_value": 35437.16773685212,
+    "ring": "upperarm_ring_x_-0.31",
+    "ring_size": 8,
+    "indices": [
+      3130,
+      3131,
+      3132,
+      3133,
+      3134,
+      3135,
+      3136,
+      3137
+    ]
+  },
+  {
+    "objective_value": 34297.728153192365,
+    "ring": "forearm_ring_x_-0.45",
+    "ring_size": 8,
+    "indices": [
+      2930,
+      2931,
+      2932,
+      2933,
+      2934,
+      2935,
+      2936,
+      2937
+    ]
+  },
+  {
+    "objective_value": 33890.21172803007,
+    "ring": "upperarm_ring_x_-0.26",
+    "ring_size": 8,
+    "indices": [
+      3122,
+      3123,
+      3124,
+      3125,
+      3126,
+      3127,
+      3128,
+      3129
+    ]
+  },
+  {
+    "objective_value": 33724.03748125668,
+    "ring": "upperarm_ring_tilt_all_10",
+    "ring_size": 8,
+    "indices": [
+      3058,
+      3059,
+      3060,
+      3061,
+      3062,
+      3063,
+      3064,
+      3065
+    ]
+  },
+  {
+    "objective_value": 33626.84929788001,
+    "ring": "forearm_ring_x_-0.40",
+    "ring_size": 8,
+    "indices": [
+      2922,
+      2923,
+      2924,
+      2925,
+      2926,
+      2927,
+      2928,
+      2929
+    ]
+  },
+  {
+    "objective_value": 33572.37995492393,
+    "ring": "upperarm_cap_2_tilt_all_-30",
+    "ring_size": 8,
+    "indices": [
+      3026,
+      3027,
+      3028,
+      3029,
+      3030,
+      3031,
+      3032,
+      3033
+    ]
+  },
+  {
+    "objective_value": 33403.32380338902,
+    "ring": "forearm_ring_x_-0.50",
+    "ring_size": 8,
+    "indices": [
+      2938,
+      2939,
+      2940,
+      2941,
+      2942,
+      2943,
+      2944,
+      2945
+    ]
+  },
+  {
+    "objective_value": 32594.508778595333,
+    "ring": "forearm_ring_x_-0.35",
+    "ring_size": 8,
+    "indices": [
+      2914,
+      2915,
+      2916,
+      2917,
+      2918,
+      2919,
+      2920,
+      2921
+    ]
+  },
+  {
+    "objective_value": 32085.727614284588,
+    "ring": "upperarm_ring_x_-0.21",
+    "ring_size": 8,
+    "indices": [
+      3114,
+      3115,
+      3116,
+      3117,
+      3118,
+      3119,
+      3120,
+      3121
+    ]
+  },
+  {
+    "objective_value": 31888.800715062396,
+    "ring": "wrist_cap_1_tilt_all_-60",
+    "ring_size": 8,
+    "indices": [
+      2810,
+      2811,
+      2812,
+      2813,
+      2814,
+      2815,
+      2816,
+      2817
+    ]
+  },
+  {
+    "objective_value": 31496.418395378794,
+    "ring": "forearm_ring_x_-0.30",
+    "ring_size": 8,
+    "indices": [
+      2906,
+      2907,
+      2908,
+      2909,
+      2910,
+      2911,
+      2912,
+      2913
+    ]
+  },
+  {
+    "objective_value": 30415.5997632997,
+    "ring": "forearm_ring_x_-0.25",
+    "ring_size": 8,
+    "indices": [
+      2898,
+      2899,
+      2900,
+      2901,
+      2902,
+      2903,
+      2904,
+      2905
+    ]
+  },
+  {
+    "objective_value": 29569.68407649678,
+    "ring": "upperarm_ring_x_-0.16",
+    "ring_size": 8,
+    "indices": [
+      3106,
+      3107,
+      3108,
+      3109,
+      3110,
+      3111,
+      3112,
+      3113
+    ]
+  },
+  {
+    "objective_value": 29335.490169526776,
+    "ring": "forearm_ring_x_-0.20",
+    "ring_size": 8,
+    "indices": [
+      2890,
+      2891,
+      2892,
+      2893,
+      2894,
+      2895,
+      2896,
+      2897
+    ]
+  },
+  {
+    "objective_value": 28943.48553762178,
+    "ring": "forearm_cap_2_tilt_all_45",
+    "ring_size": 8,
+    "indices": [
+      2850,
+      2851,
+      2852,
+      2853,
+      2854,
+      2855,
+      2856,
+      2857
+    ]
+  },
+  {
+    "objective_value": 28479.88327834875,
+    "ring": "upperarm_cap_1_tilt_all_-30",
+    "ring_size": 8,
+    "indices": [
+      3194,
+      3195,
+      3196,
+      3197,
+      3198,
+      3199,
+      3200,
+      3201
+    ]
+  },
+  {
+    "objective_value": 28225.57499753382,
+    "ring": "forearm_ring_x_-0.15",
+    "ring_size": 8,
+    "indices": [
+      2882,
+      2883,
+      2884,
+      2885,
+      2886,
+      2887,
+      2888,
+      2889
+    ]
+  },
+  {
+    "objective_value": 26822.530277116024,
+    "ring": "wrist_cap_2_tilt_all_60",
+    "ring_size": 8,
+    "indices": [
+      2762,
+      2763,
+      2764,
+      2765,
+      2766,
+      2767,
+      2768,
+      2769
+    ]
+  },
+  {
+    "objective_value": 26760.126309690804,
+    "ring": "forearm_ring",
+    "ring_size": 8,
+    "indices": [
+      2866,
+      2867,
+      2868,
+      2869,
+      2870,
+      2871,
+      2872,
+      2873
+    ]
+  },
+  {
+    "objective_value": 26760.126309690804,
+    "ring": "forearm_ring_x_-0.10",
+    "ring_size": 8,
+    "indices": [
+      2874,
+      2875,
+      2876,
+      2877,
+      2878,
+      2879,
+      2880,
+      2881
+    ]
+  },
+  {
+    "objective_value": 26538.234257747255,
+    "ring": "forearm_cap_1_tilt_all_45",
+    "ring_size": 8,
+    "indices": [
+      2986,
+      2987,
+      2988,
+      2989,
+      2990,
+      2991,
+      2992,
+      2993
+    ]
+  },
+  {
+    "objective_value": 26335.188818588435,
+    "ring": "flange_ring_tilt_all_-45",
+    "ring_size": 8,
+    "indices": [
+      2690,
+      2691,
+      2692,
+      2693,
+      2694,
+      2695,
+      2696,
+      2697
+    ]
+  },
+  {
+    "objective_value": 26219.349544548088,
+    "ring": "upperarm_ring_tilt_all_0",
+    "ring_size": 8,
+    "indices": [
+      3050,
+      3051,
+      3052,
+      3053,
+      3054,
+      3055,
+      3056,
+      3057
+    ]
+  },
+  {
+    "objective_value": 26219.349544548088,
+    "ring": "upperarm_ring_x_-0.11",
+    "ring_size": 8,
+    "indices": [
+      3098,
+      3099,
+      3100,
+      3101,
+      3102,
+      3103,
+      3104,
+      3105
+    ]
+  },
+  {
+    "objective_value": 17044.819466243483,
+    "ring": "upperarm_cap_2_tilt_all_-45",
+    "ring_size": 8,
+    "indices": [
+      3034,
+      3035,
+      3036,
+      3037,
+      3038,
+      3039,
+      3040,
+      3041
+    ]
+  },
+  {
+    "objective_value": 17007.452882318063,
+    "ring": "flange_ring_tilt_all_-60",
+    "ring_size": 8,
+    "indices": [
+      2698,
+      2699,
+      2700,
+      2701,
+      2702,
+      2703,
+      2704,
+      2705
+    ]
+  },
+  {
+    "objective_value": 16695.264793043276,
+    "ring": "forearm_cap_2_tilt_all_60",
+    "ring_size": 8,
+    "indices": [
+      2858,
+      2859,
+      2860,
+      2861,
+      2862,
+      2863,
+      2864,
+      2865
+    ]
+  },
+  {
+    "objective_value": 13833.803137372704,
+    "ring": "forearm_cap_1_tilt_all_60",
+    "ring_size": 8,
+    "indices": [
+      2994,
+      2995,
+      2996,
+      2997,
+      2998,
+      2999,
+      3000,
+      3001
+    ]
+  },
+  {
+    "objective_value": 11854.758872737339,
+    "ring": "forearm_ring_x_-0.55",
+    "ring_size": 8,
+    "indices": [
+      2946,
+      2947,
+      2948,
+      2949,
+      2950,
+      2951,
+      2952,
+      2953
+    ]
+  },
+  {
+    "objective_value": 10410.617960841844,
+    "ring": "flange_ring_tilt_all_-75",
+    "ring_size": 8,
+    "indices": [
+      2706,
+      2707,
+      2708,
+      2709,
+      2710,
+      2711,
+      2712,
+      2713
+    ]
+  },
+  {
+    "objective_value": 10141.18036012323,
+    "ring": "upperarm_cap_1_tilt_all_-45",
+    "ring_size": 8,
+    "indices": [
+      3202,
+      3203,
+      3204,
+      3205,
+      3206,
+      3207,
+      3208,
+      3209
+    ]
+  },
+  {
+    "objective_value": 7634.169864066297,
+    "ring": "upperarm_cap_2_tilt_all_-60",
+    "ring_size": 8,
+    "indices": [
+      3042,
+      3043,
+      3044,
+      3045,
+      3046,
+      3047,
+      3048,
+      3049
+    ]
+  },
+  {
+    "objective_value": 5550.281283042379,
+    "ring": "flange_ring_tilt_all_-90",
+    "ring_size": 8,
+    "indices": [
+      2714,
+      2715,
+      2716,
+      2717,
+      2718,
+      2719,
+      2720,
+      2721
+    ]
+  },
+  {
+    "objective_value": 3980.269702764509,
+    "ring": "upperarm_cap_1_tilt_all_-60",
+    "ring_size": 8,
+    "indices": [
+      3210,
+      3211,
+      3212,
+      3213,
+      3214,
+      3215,
+      3216,
+      3217
+    ]
+  }
+]
