@@ -520,7 +520,7 @@ def parse_args():
     ap.add_argument("--softmin-temp", type=float, default=0.3)
     ap.add_argument("--frac-alpha", type=float, default=0.6)
 
-    ap.add_argument("--k", type=int, default=25)
+    ap.add_argument("--k", type=int, default=24)
     ap.add_argument("--iters", type=int, default=60)
     ap.add_argument("--rcl-size", type=int, default=5)
     ap.add_argument("--procs", type=int, default=None)

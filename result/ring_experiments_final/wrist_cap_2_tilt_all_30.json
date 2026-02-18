@@ -2,9 +2,9 @@
   "name": "wrist_cap_2_tilt_all_30",
   "status": "ok",
   "objective_mode": "sum",
-  "objective_value": 121326.5124069422,
+  "objective_value": 121054.73420793776,
   "selected_sensors": [
-    162,
+    163,
     645,
     1456,
     1471,
@@ -23,14 +23,13 @@
     2827,
     2832,
     2842,
-    2954,
+    2962,
     2966,
     2989,
     3008,
-    3096,
     3173
   ],
-  "k": 25,
+  "k": 24,
   "fixed": [
     2746,
     2747,

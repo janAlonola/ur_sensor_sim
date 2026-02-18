@@ -305,6 +305,34 @@ def local_search_one_swap_multipose(sel, rows, V, W,
 
 # ---------------------------- Weight aggregation ----------------------------
 
+def _load_fixed_sensors(spec: str) -> list[int]:
+    spec = (spec or "").strip()
+    if not spec:
+        return []
+
+    p = Path(spec)
+    if p.exists() and p.is_file():
+        # allow .yaml/.yml/.json/.txt
+        if p.suffix.lower() in [".yaml", ".yml"]:
+            doc = yaml.safe_load(p.read_text())
+            # accept either {"fixed_sensors":[...]} or just [...]
+            if isinstance(doc, dict) and "fixed_sensors" in doc:
+                arr = doc["fixed_sensors"]
+            else:
+                arr = doc
+        elif p.suffix.lower() == ".json":
+            doc = json.loads(p.read_text())
+            arr = doc["fixed_sensors"] if isinstance(doc, dict) and "fixed_sensors" in doc else doc
+        else:
+            # text file: whitespace/comma separated ints
+            txt = p.read_text().replace(",", " ")
+            arr = [int(x) for x in txt.split() if x.strip()]
+        return sorted({int(x) for x in arr})
+
+    # otherwise interpret as comma-separated list
+    parts = [s.strip() for s in spec.split(",") if s.strip()]
+    return sorted({int(x) for x in parts})
+
 
 def load_weight_npys_matrix(paths_or_globs, V, normalize=False, expect_P=None):
     """
@@ -487,9 +515,9 @@ def multipose_grasp(
 
 def parse_args():
     ap = argparse.ArgumentParser(description="Optimize one sensor set over MANY poses (multi-pose objective).")
-    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_ring_vars",
+    ap.add_argument("--heatmaps", default="ur_sensor_sim/tmp/big_visibility_vars_patched",
                     help="Directory (or single YAML) of COMBINED heatmaps (big + ring already stacked).")
-    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_bigger_zeros/*.npy"],
+    ap.add_argument("--weights-list", nargs="+", default=["ur_sensor_sim/tmp/weighted_poses_tcp/*.npy"],
                     help="One or more .npy paths or globs (one per pose).")
     ap.add_argument("--weights-agg", choices=["max","mean","softmax"], default="max")
     ap.add_argument("--weights-temp", type=float, default=0.5)
@@ -499,20 +527,22 @@ def parse_args():
     ap.add_argument("--softmin-temp", type=float, default=0.3)
     ap.add_argument("--frac-alpha", type=float, default=0.6)
 
-    ap.add_argument("--k", type=int, default=25)
+    ap.add_argument("--k", type=int, default=27)
     ap.add_argument("--iters", type=int, default=60)
     ap.add_argument("--rcl-size", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/ring_experiments/no_ring.json")
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/best_3_ring_3_free.json")
     ap.add_argument("--procs", type=int, default=None)
 
     ap.add_argument("--local-rounds", type=int, default=1000)
     ap.add_argument("--ls-sample-in", type=int, default=None)
 
-    # NEW: tell optimizer how many sensors at the end are fixed (the ring)
-    ap.add_argument("--fixed-tail", type=int, default=0,
-                    help="Number of fixed sensors appended at the end of the combined candidate set (ring size).")
+    # fixed sensors
+
+    ap.add_argument("--fixed-sensors", type=str, default="2962,2963,2964,2965,2966,2967,2968,2969,3010,3011,3012,3013,3014,3015,3016,3017,3082,3083,3084,3085,3086,3087,3088,3089",
+                help="Comma-separated list of fixed sensor indices, or a path to a .yaml/.json/.txt file.")
+
 
     return ap.parse_args()
 
@@ -530,11 +560,17 @@ def main():
     W, weight_files = load_weight_npys_matrix(args.weights_list, V, normalize=args.normalize_weights, expect_P=P)
     print(f"[INFO] Loaded W: {W.shape} from {len(weight_files)} files.")
 
-    # 3) Fixed sensors are the last --fixed-tail indices
-    if args.fixed_tail < 0 or args.fixed_tail > S:
-        raise SystemExit(f"--fixed-tail must be in [0,{S}], got {args.fixed_tail}")
-    fixed = list(range(S - args.fixed_tail, S))
-    print(f"[INFO] Fixed sensors: {fixed}")
+    # 3) Fixed sensors
+    
+    fixed = _load_fixed_sensors(args.fixed_sensors)
+
+    # validate
+    if any((f < 0 or f >= S) for f in fixed):
+        bad = [f for f in fixed if f < 0 or f >= S]
+        raise SystemExit(f"fixed sensors out of range [0,{S-1}]: {bad[:20]}")
+
+    print(f"[INFO] Fixed sensors ({len(fixed)}): {fixed}")
+
 
     # 4) Run optimizer (must have fixed-aware GRASP/local-search drop-ins installed)
     sel, obj = parallel_multipose_grasp_pose_weights(

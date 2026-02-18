@@ -2,14 +2,13 @@
   "name": "forearm_ring_x_-0.45",
   "status": "ok",
   "objective_mode": "sum",
-  "objective_value": 122046.18329455699,
+  "objective_value": 121655.63907469317,
   "selected_sensors": [
-    159,
+    162,
     265,
     266,
     310,
     646,
-    1286,
     1456,
     1792,
     2219,
@@ -30,7 +29,7 @@
     3181,
     3182
   ],
-  "k": 25,
+  "k": 24,
   "fixed": [
     2930,
     2931,

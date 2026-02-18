@@ -517,12 +517,12 @@ def parse_args():
     ap.add_argument("--frac-alpha", type=float, default=0.6,
                     help="Required pose fraction for --objective=frac (e.g., 0.7 means ≥70% of poses).")
 
-    ap.add_argument("--k", type=int, default=25, help="Sensor budget.")
+    ap.add_argument("--k", type=int, default=18, help="Sensor budget.")
     ap.add_argument("--iters", type=int, default=60, help="Greedy restarts.")
     ap.add_argument("--rcl-size", type=int, default=5, help="Restricted candidate list size.")
     ap.add_argument("--seed", type=int, default=0, help="Random seed.")
     ap.add_argument("--verbose", action="store_true", help="Verbose per-iter logs.")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/final_experiment_25.json",
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/final_experiment_18.json",
                     help="Save results JSON here.")
     ap.add_argument("--procs", type=int, default=None, help="Processes for parallel seeds (default: CPU count)")
 
