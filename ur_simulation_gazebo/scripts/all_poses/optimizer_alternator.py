@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 import numpy as np
+import math
 import yaml
 try:
     from yaml import CSafeLoader as YLoader
@@ -49,14 +50,14 @@ def _init_globals(A_list, W):
     _G_W = W
 
 def _one_seed_worker(seed, k, rcl_size, mode, softmin_temp, frac_alpha, iters_per_seed,
-                     verbose, local_rounds, ls_sample_in, fixed):
+                     verbose, local_rounds, ls_sample_in, fixed, allowed_set):
     sel, obj = multipose_grasp(
         A_list=_G_A_LIST, k=k, W=_G_W,
         iters=iters_per_seed, rcl_size=rcl_size,
         mode=mode, softmin_temp=softmin_temp, frac_alpha=frac_alpha,
         seed=seed, verbose=verbose,
         local_rounds=local_rounds, ls_sample_in=ls_sample_in,
-        fixed=fixed
+        fixed=fixed, allowed_set=allowed_set
     )
     return (obj, sel, seed)
 
@@ -65,7 +66,7 @@ def parallel_multipose_grasp_pose_weights(A_list, W, k,
                                           mode="sum", softmin_temp=0.3, frac_alpha=0.6,
                                           procs=None, iters_per_seed=1,
                                           local_rounds=100, ls_sample_in=None,
-                                          fixed=None,
+                                          fixed=None, allowed_set=None,
                                           verbose=False):
     procs = procs or cpu_count()
     seeds = list(range(iters))
@@ -86,7 +87,8 @@ def parallel_multipose_grasp_pose_weights(A_list, W, k,
                     softmin_temp=softmin_temp, frac_alpha=frac_alpha,
                     iters_per_seed=iters_per_seed,
                     verbose=False, local_rounds=local_rounds, ls_sample_in=ls_sample_in,
-                    fixed=fixed or []),
+                    fixed=fixed or [],
+                    allowed_set=allowed_set),
             seeds,
             chunksize=max(1, iters // (procs * 4) or 1)
         ):
@@ -147,6 +149,79 @@ def build_pose_csrs_from_heatmap(yaml_path: Path):
                        shape=(S, V), dtype=np.float32)
         A_list.append(A)
     return A_list, V, S
+
+def load_candidate_positions_and_links_from_yaml(path: str, expected_S: int = None) -> tuple[np.ndarray, list[str]]:
+    """
+    Load candidate sensor positions (x,y,z) AND their parent link/frame name from YAML.
+
+    Tries to read a link identifier from common keys:
+      - "link", "parent_link", "frame", "frame_id"
+      - nested: pose.frame_id, header.frame_id
+    Returns:
+      pos: (S,3) float64
+      links: list[str] length S
+    """
+    p = Path(path)
+    if not p.exists():
+        raise SystemExit(f"--candidates-yaml not found: {path}")
+
+    doc = yaml.safe_load(p.read_text())
+
+    if isinstance(doc, dict):
+        if "candidates" in doc:
+            doc = doc["candidates"]
+        elif "sensors" in doc:
+            doc = doc["sensors"]
+        elif "poses" in doc:
+            doc = doc["poses"]
+
+    if not isinstance(doc, list):
+        raise SystemExit(f"{path}: unsupported YAML structure for candidates (expected list)")
+
+    pos = []
+    links = []
+
+    def _get_link(item: dict, idx: int) -> str:
+        for k in ("link", "parent_link", "frame", "frame_id"):
+            if k in item and item[k]:
+                return str(item[k])
+        # nested common patterns
+        if "pose" in item and isinstance(item["pose"], dict):
+            for k in ("frame", "frame_id", "parent_link", "link"):
+                if k in item["pose"] and item["pose"][k]:
+                    return str(item["pose"][k])
+        if "header" in item and isinstance(item["header"], dict) and "frame_id" in item["header"]:
+            return str(item["header"]["frame_id"])
+        raise SystemExit(f"{path}: candidate {idx} has no recognizable link/frame field")
+
+    for i, item in enumerate(doc):
+        if isinstance(item, dict):
+            if "position" in item:
+                xyz = item["position"]
+            elif "xyz" in item:
+                xyz = item["xyz"]
+            elif "translation" in item:
+                xyz = item["translation"]
+            elif "pose" in item and isinstance(item["pose"], dict) and "position" in item["pose"]:
+                xyz = item["pose"]["position"]
+            else:
+                raise SystemExit(f"{path}: candidate {i} has no recognizable position field")
+
+            link = _get_link(item, i)
+
+        else:
+            raise SystemExit(f"{path}: candidate {i} has unsupported entry type (expected dict)")
+
+        if len(xyz) != 3:
+            raise SystemExit(f"{path}: candidate {i} position has length {len(xyz)} != 3")
+
+        pos.append([float(xyz[0]), float(xyz[1]), float(xyz[2])])
+        links.append(link)
+
+    pos = np.asarray(pos, dtype=np.float64)
+    if expected_S is not None and pos.shape[0] != expected_S:
+        raise SystemExit(f"{path}: loaded {pos.shape[0]} candidates, but heatmaps report S={expected_S}")
+    return pos, links
 
 def load_all_pose_csrs(heatmaps_path: str):
     """Accept a single file or a directory of heatmaps and return a single A_list across ALL poses."""
@@ -225,15 +300,57 @@ def extract_rows(A_list):
         rows.append(rp)
     return rows, S, V, P
 
+def compute_allowed_set_by_anchor_radius(anchor_ids: List[int],
+                                         positions: np.ndarray,
+                                         links: List[str],
+                                         max_dist_m: float) -> set[int]:
+    """
+    Allowed = union of sensors within max_dist_m of any anchor sensor position,
+    but ONLY if they are on the same parent link/frame as that anchor.
+    """
+    S = positions.shape[0]
+    if len(links) != S:
+        raise SystemExit("links list length mismatch with positions")
+
+    anchors = sorted(set(int(a) for a in anchor_ids))
+    if any(a < 0 or a >= S for a in anchors):
+        bad = [a for a in anchors if a < 0 or a >= S]
+        raise SystemExit(f"anchor sensors out of range [0,{S-1}]: {bad[:20]}")
+
+    thr2 = float(max_dist_m) ** 2
+    allowed = set()
+
+    # Pre-group candidates by link to avoid scanning all S each time
+    by_link: dict[str, np.ndarray] = {}
+    for idx, lk in enumerate(links):
+        by_link.setdefault(lk, []).append(idx)
+    for lk in list(by_link.keys()):
+        by_link[lk] = np.asarray(by_link[lk], dtype=np.int32)
+
+    for a in anchors:
+        lk = links[a]
+        if lk not in by_link:
+            continue
+        idxs = by_link[lk]               # only candidates on same link
+        pa = positions[a]
+        d2 = np.sum((positions[idxs] - pa) ** 2, axis=1)
+        near = idxs[d2 <= thr2]
+        allowed.update(int(x) for x in near.tolist())
+
+    allowed.update(anchors)  # anchors always allowed
+    return allowed
+
 # ---------------------------- Local Search  ----------------------------
 
 
 def local_search_one_swap_multipose(sel, rows, V, W,
                                     mode="sum", softmin_temp=0.3, frac_alpha=0.6,
                                     max_rounds=100, verbose=False, sample_in=None,
-                                    fixed_set=None):
+                                    fixed_set=None,
+                                    allowed_set=None):
     P = len(rows)
     S = len(rows[0])
+    allowed_set = set(range(S)) if allowed_set is None else set(allowed_set)
     sel = list(sel)
     sel_set = set(sel)
     fixed_set = set(fixed_set or [])
@@ -267,7 +384,7 @@ def local_search_one_swap_multipose(sel, rows, V, W,
             base_masks = build_masks(base_sel)
             base_score = objective_from_masks(base_masks, W, mode, softmin_temp, frac_alpha)
 
-            candidates_in = list(set(range(S)) - set(base_sel))
+            candidates_in = list(allowed_set - set(base_sel))
             if sample_in is not None and sample_in < len(candidates_in):
                 candidates_in = random.sample(candidates_in, sample_in)
             random.shuffle(candidates_in)
@@ -421,12 +538,17 @@ def multipose_grasp(
     mode="sum", softmin_temp=0.3, frac_alpha=0.6,
     seed=None, verbose=False,
     local_rounds=100, ls_sample_in=None,
-    fixed=None
+    fixed=None,
+    allowed_set=None
 ):
     if seed is not None:
         random.seed(seed); np.random.seed(seed)
 
     rows, S, V, P = extract_rows(A_list)
+
+    allowed_set = set(range(S)) if allowed_set is None else set(allowed_set)
+    if not allowed_set:
+        raise ValueError("allowed_set is empty; no candidates available under the constraint.")
 
     fixed = sorted(set(fixed or []))
     fixed_set = set(fixed)
@@ -439,7 +561,8 @@ def multipose_grasp(
 
     for rep in range(iters):
         sel = list(fixed)
-        remaining = np.ones(S, dtype=bool)
+        remaining = np.zeros(S, dtype=bool)
+        remaining[list(allowed_set)] = True
         remaining[fixed] = False
 
         covered_p = np.zeros((P, V), dtype=bool)
@@ -502,7 +625,8 @@ def multipose_grasp(
             sel, rows, V, W,
             mode=mode, softmin_temp=softmin_temp, frac_alpha=frac_alpha,
             max_rounds=local_rounds, verbose=verbose, sample_in=ls_sample_in,
-            fixed_set=fixed_set
+            fixed_set=fixed_set,
+            allowed_set=allowed_set
         )
 
         if obj2 > best_obj + 1e-12:
@@ -527,20 +651,28 @@ def parse_args():
     ap.add_argument("--softmin-temp", type=float, default=0.3)
     ap.add_argument("--frac-alpha", type=float, default=0.6)
 
-    ap.add_argument("--k", type=int, default=28)
+    ap.add_argument("--k", type=int, default=24)
     ap.add_argument("--iters", type=int, default=60)
     ap.add_argument("--rcl-size", type=int, default=5)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--verbose", action="store_true")
-    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/11th_best_4_free.json")
+    ap.add_argument("--export-json", type=str, default="ur_sensor_sim/tmp/alternator_1.json")
     ap.add_argument("--procs", type=int, default=None)
 
     ap.add_argument("--local-rounds", type=int, default=1000)
     ap.add_argument("--ls-sample-in", type=int, default=None)
 
+    ap.add_argument("--candidates-yaml", type=str, default="ur_sensor_sim/mesh_sampling/big_candidates_vars.yaml",
+                    help="YAML file containing candidate sensor poses with positions (x,y,z).")
+    ap.add_argument("--anchor-sensors", type=str, default="2962,2963,2964,2965,2966,2967,2968,2969,3010,3011,3012,3013,3014,3015,3016,3017,3082,3083,3084,3085,3086,3087,3088,3089",
+                    help="Comma-separated list (or file) of anchor sensor indices. "
+                         "If set, selectable sensors are restricted to those within --max-replace-dist of any anchor.")
+    ap.add_argument("--max-replace-dist", type=float, default=0.03,
+                    help="Max allowed distance (meters) from an anchor sensor position (default: 0.05 m).")
+
     # fixed sensors
 
-    ap.add_argument("--fixed-sensors", type=str, default="2834,2835,2836,2837,2838,2839,2840,2841,3010,3011,3012,3013,3014,3015,3016,3017,3082,3083,3084,3085,3086,3087,3088,3089",
+    ap.add_argument("--fixed-sensors", type=str, default="",
                     help="Comma-separated list of fixed sensor indices, or a path to a .yaml/.json/.txt file.")
 
 
@@ -560,10 +692,18 @@ def main():
     W, weight_files = load_weight_npys_matrix(args.weights_list, V, normalize=args.normalize_weights, expect_P=P)
     print(f"[INFO] Loaded W: {W.shape} from {len(weight_files)} files.")
 
-    # 3) Fixed sensors
-    
+    # 3) Fixed sensors (hard fixed; cannot be removed)
     fixed = _load_fixed_sensors(args.fixed_sensors)
 
+    # 3b) Anchor sensors (soft constraint: replacement neighborhood)
+    anchors = _load_fixed_sensors(args.anchor_sensors) if args.anchor_sensors else []
+    allowed_set = None
+    if anchors:
+        positions, links = load_candidate_positions_and_links_from_yaml(args.candidates_yaml, expected_S=S)
+        allowed_set = compute_allowed_set_by_anchor_radius(anchors, positions, links, args.max_replace_dist)
+        print(f"[INFO] Anchor constraint active: {len(anchors)} anchors, "
+              f"max_dist={args.max_replace_dist:.3f} m, allowed candidates={len(allowed_set)}/{S}.")
+    
     # validate
     if any((f < 0 or f >= S) for f in fixed):
         bad = [f for f in fixed if f < 0 or f >= S]
@@ -582,6 +722,7 @@ def main():
         local_rounds=args.local_rounds,
         ls_sample_in=args.ls_sample_in,
         fixed=fixed,
+        allowed_set=allowed_set,
         verbose=False
     )
 

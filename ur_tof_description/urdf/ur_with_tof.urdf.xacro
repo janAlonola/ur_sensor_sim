@@ -32,31 +32,30 @@
   </xacro:ur_robot>
 
   <!-- Attach ToF sensors (auto-generated) -->
-  <xacro:tof_sensor name="tof_277" parent="forearm_link" xyz="-0.524957456 0.0127438344 0.0964067972" rpy="-0.28418164 -0.00354926325 0.28418164" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_2962" parent="forearm_link" xyz="0.035 0 -0.02" rpy="0 0.174532925 0" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_1449" parent="upper_arm_link" xyz="-0.570020251 -0.0227303371 0.248646208" rpy="-3.14139326 -1.43986059 3.14139326" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_1894" parent="upper_arm_link" xyz="-0.130203363 -0.0045462227 0.117134289" rpy="1.57079003 1.52726959 -1.57079003" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_1930" parent="upper_arm_link" xyz="-0.101416039 0.0290004968 0.229393058" rpy="-2.88515969 -0.416228119 2.88515969" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_2954" parent="forearm_link" xyz="0.035 0 -0.02" rpy="0 -0 0" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_2956" parent="forearm_link" xyz="-0.020013442 0.043871756 -0.02" rpy="-1.7951958 -7.48578174e-17 1.7951958" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_2963" parent="forearm_link" xyz="0.0180570411 0.0351824167 -0.02" rpy="-0.897597901 0.174532925 0.897597901" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_2964" parent="forearm_link" xyz="-0.020013442 0.043871756 -0.02" rpy="-1.7951958 0.174532925 1.7951958" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_2965" parent="forearm_link" xyz="-0.0505435991 0.0195247683 -0.02" rpy="-2.6927937 0.174532925 2.6927937" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_2966" parent="forearm_link" xyz="-0.0505435991 -0.0195247683 -0.02" rpy="2.6927937 0.174532925 -2.6927937" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_2967" parent="forearm_link" xyz="-0.020013442 -0.043871756 -0.02" rpy="1.7951958 0.174532925 -1.7951958" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_2968" parent="forearm_link" xyz="0.0180570411 -0.0351824167 -0.02" rpy="0.897597901 0.174532925 -0.897597901" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_2969" parent="forearm_link" xyz="-0.01 0 -0.02" rpy="3.14159265 1.57079633 0" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3010" parent="upper_arm_link" xyz="-0.557 0 0.245" rpy="0 -0.174532925 0" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_2974" parent="forearm_link" xyz="-0.0505435991 -0.0195247683 -0.02" rpy="2.6927937 0.261799388 -2.6927937" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_2988" parent="forearm_link" xyz="-0.020013442 0.043871756 -0.02" rpy="-1.7951958 0.785398163 1.7951958" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_3011" parent="upper_arm_link" xyz="-0.577708061 0.0430007315 0.245" rpy="-0.897597901 -0.174532925 0.897597901" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3012" parent="upper_arm_link" xyz="-0.624238651 0.0536210352 0.245" rpy="-1.7951958 -0.174532925 1.7951958" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3013" parent="upper_arm_link" xyz="-0.661553288 0.0238636057 0.245" rpy="-2.6927937 -0.174532925 2.6927937" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3014" parent="upper_arm_link" xyz="-0.661553288 -0.0238636057 0.245" rpy="2.6927937 -0.174532925 -2.6927937" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3015" parent="upper_arm_link" xyz="-0.624238651 -0.0536210352 0.245" rpy="1.7951958 -0.174532925 -1.7951958" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_3016" parent="upper_arm_link" xyz="-0.577708061 -0.0430007315 0.245" rpy="0.897597901 -0.174532925 -0.897597901" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3017" parent="upper_arm_link" xyz="-0.612 0 0.245" rpy="-0 -1.57079633 0" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3082" parent="upper_arm_link" xyz="-0.11 0.055 0.176" rpy="-2.35619449 -1.04530143e-16 2.35619449" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3083" parent="upper_arm_link" xyz="-0.11 0.038890873 0.214890873" rpy="-2.52611294 -0.523598776 2.52611294" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3084" parent="upper_arm_link" xyz="-0.11 3.3677787e-18 0.231" rpy="-3.14159265 -0.785398163 3.14159265" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3018" parent="upper_arm_link" xyz="-0.557 0 0.245" rpy="0 -0.261799388 0" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3023" parent="upper_arm_link" xyz="-0.624238651 -0.0536210352 0.245" rpy="1.7951958 -0.261799388 -1.7951958" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3034" parent="upper_arm_link" xyz="-0.557 0 0.245" rpy="0 -0.785398163 0" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3065" parent="upper_arm_link" xyz="-0.11 0.038890873 0.137109127" rpy="-1.81517632 0.770319033 1.81517632" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3070" parent="upper_arm_link" xyz="-0.11 -0.055 0.176" rpy="1.83259571 -7.70804357e-17 -1.83259571" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3071" parent="upper_arm_link" xyz="-0.11 -0.038890873 0.137109127" rpy="1.93301447 0.751879414 -1.93301447" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3074" parent="upper_arm_link" xyz="-0.11 0.055 0.176" rpy="-2.0943951 -9.18485099e-17 2.0943951" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_3085" parent="upper_arm_link" xyz="-0.11 -0.038890873 0.214890873" rpy="2.52611294 -0.523598776 -2.52611294" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3086" parent="upper_arm_link" xyz="-0.11 -0.055 0.176" rpy="2.35619449 -1.04530143e-16 -2.35619449" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3087" parent="upper_arm_link" xyz="-0.11 -0.038890873 0.137109127" rpy="2.52611294 0.523598776 -2.52611294" max_range="3" rate="15"/>
   <xacro:tof_sensor name="tof_3088" parent="upper_arm_link" xyz="-0.11 -1.01033361e-17 0.121" rpy="3.14159265 0.785398163 -3.14159265" max_range="3" rate="15"/>
-  <xacro:tof_sensor name="tof_3089" parent="upper_arm_link" xyz="-0.11 0.038890873 0.137109127" rpy="-2.52611294 0.523598776 2.52611294" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3094" parent="upper_arm_link" xyz="-0.11 -0.055 0.176" rpy="2.61799388 -1.14261102e-16 -2.61799388" max_range="3" rate="15"/>
+  <xacro:tof_sensor name="tof_3097" parent="upper_arm_link" xyz="-0.11 0.038890873 0.137109127" rpy="-2.75399597 0.361367124 2.75399597" max_range="3" rate="15"/>
 
   <!-- Gazebo ROS 2 Control -->
   <gazebo>
